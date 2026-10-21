@@ -1,0 +1,8 @@
+export default function ResetPasswordPage() {
+  return (
+    <main>
+      <h1>Set New Password</h1>
+      <p>Enter your new password below</p>
+    </main>
+  );
+}
