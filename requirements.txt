@@ -1,9 +1,16 @@
 asgiref==3.12.1
 Django==6.1.2
+dj-database-url>=2.3.0,<4
 django-cors-headers==4.9.0
 djangorestframework==3.18.3
 djangorestframework_simplejwt==5.5.1
+google-api-python-client>=2.160.0,<3
+google-auth-httplib2>=0.2.0,<1
+google-auth>=2.38.0,<3
+google-auth-oauthlib>=1.2.1,<2
 pip==26.2.1
+psycopg[binary]>=3.2.0,<4
 PyJWT==2.15.1
+python-dotenv>=1.0.0,<2
 sqlparse==0.6.0
 tzdata==2026.5

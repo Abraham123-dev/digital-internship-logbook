@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 import os
+from datetime import timedelta
+from urllib.parse import urlsplit
+
 from dotenv import load_dotenv
 import dj_database_url
 
@@ -23,12 +26,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 load_dotenv()
+FRONTEND_URL = (
+    os.getenv("FRONTEND_URL") or "http://localhost:3000"
+).rstrip("/")
+frontend_url_parts = urlsplit(FRONTEND_URL)
+FRONTEND_ORIGIN = f"{frontend_url_parts.scheme}://{frontend_url_parts.netloc}"
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "True").lower() in {"1", "true", "yes"}
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
 
 
 # Application definition
@@ -42,10 +53,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     "rest_framework",
     "corsheaders",
+    "rest_framework_simplejwt.token_blacklist",
+    "backend.auth.apps.AuthConfig",
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -53,6 +67,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+CORS_ALLOWED_ORIGINS = [FRONTEND_ORIGIN]
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [FRONTEND_ORIGIN]
 
 ROOT_URLCONF = 'backend.urls'
 
@@ -111,13 +129,15 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTH_USER_MODEL = "accounts.LogrAccount"
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Lagos'
 
 USE_I18N = True
 
@@ -129,12 +149,28 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Authentication and email configuration.
+STUDENT_EMAIL_DOMAINS = [
+    domain.strip().lower()
+    for domain in os.getenv("STUDENT_EMAIL_DOMAINS", "").split(",")
+    if domain.strip()
+]
+GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID", "")
+GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET", "")
+GMAIL_REFRESH_TOKEN = os.getenv("GMAIL_REFRESH_TOKEN", "")
+GMAIL_SENDER_EMAIL = os.getenv("GMAIL_SENDER_EMAIL", os.getenv("GMAIL_FROM_EMAIL", ""))
+GMAIL_TOKEN_URI = os.getenv("GMAIL_TOKEN_URI", "https://oauth2.googleapis.com/token")
 
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
+if os.getenv("CACHE_BACKEND") == "database":
+    CACHES = {"default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": os.getenv("CACHE_TABLE", "django_cache"),
+        "TIMEOUT": 600,
+    }}
+else:
+    CACHES = {"default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "logr-auth-cache",
+        "TIMEOUT": 600,
+    }}
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
