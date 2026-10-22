@@ -1,0 +1,40 @@
+from django.urls import path
+
+from .views import (
+    AcceptInvitationView,
+    AdminLoginView,
+    ChangePasswordView,
+    ForgotPasswordView,
+    InvitationListCreateView,
+    InvitationManageView,
+    LoginView,
+    LogoutView,
+    RefreshView,
+    ResendOTPView,
+    ResetPasswordView,
+    SignupView,
+    StudentProfileView,
+    CoordinatorProfileView,
+    ValidateInvitationView,
+    VerifyOTPView,
+)
+
+urlpatterns = [
+    path("auth/student/signup/", SignupView.as_view(), name="student-signup"),
+    path("auth/student/verify-otp/", VerifyOTPView.as_view(), name="student-verify-otp"),
+    path("auth/student/resend-otp/", ResendOTPView.as_view(), name="student-resend-otp"),
+    path("auth/login/", LoginView.as_view(), name="login"),
+    path("auth/admin/login/", AdminLoginView.as_view(), name="admin-login"),
+    path("auth/refresh/", RefreshView.as_view(), name="refresh"),
+    path("auth/logout/", LogoutView.as_view(), name="logout"),
+    path("auth/forgot-password/", ForgotPasswordView.as_view(), name="forgot-password"),
+    path("auth/reset-password/", ResetPasswordView.as_view(), name="reset-password"),
+    path("me/student-profile/", StudentProfileView.as_view(), name="student-profile"),
+    path("me/coordinator-profile/", CoordinatorProfileView.as_view(), name="coordinator-profile"),
+    path("me/password/", ChangePasswordView.as_view(), name="change-password"),
+    path("admin/invitations/", InvitationListCreateView.as_view(), name="invitations"),
+    path("admin/invitations/<int:invitation_id>/resend/", InvitationManageView.as_view(), name="invitation-resend"),
+    path("admin/invitations/<int:invitation_id>/", InvitationManageView.as_view(), name="invitation-revoke"),
+    path("invitations/validate/", ValidateInvitationView.as_view(), name="invitation-validate"),
+    path("invitations/accept/", AcceptInvitationView.as_view(), name="invitation-accept"),
+]
