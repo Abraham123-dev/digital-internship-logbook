@@ -275,3 +275,33 @@ class AuditLog(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+
+class InAppNotification(models.Model):
+    class Trigger(models.TextChoices):
+        WEEK_UNSUBMITTED_FRIDAY = "week_unsubmitted_friday", "Week unsubmitted Friday"
+        WEEK_UNSUBMITTED_SATURDAY = "week_unsubmitted_saturday", "Week unsubmitted Saturday"
+        WEEK_LOCKED = "week_locked", "Week locked"
+        WEEK_SUBMITTED_COORDINATOR = "week_submitted_coordinator", "Week submitted to coordinator"
+        EXTENSION_REQUESTED = "extension_requested", "Extension requested"
+        EXTENSION_APPROVED = "extension_approved", "Extension approved"
+        EXTENSION_DENIED = "extension_denied", "Extension denied"
+        WEEK_RETURNED = "week_returned", "Week returned"
+        WEEK_REVIEWED = "week_reviewed", "Week reviewed"
+        SUPERVISOR_DETAILS_RECEIVED = "supervisor_details_received", "Supervisor details received"
+        SUPERVISOR_REVIEW_SUBMITTED = "supervisor_review_submitted", "Supervisor review submitted"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    trigger = models.CharField(max_length=40, choices=Trigger.choices)
+    message = models.CharField(max_length=300)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    link_to = models.CharField(max_length=300, blank=True)
+    dedupe_key = models.CharField(max_length=180, unique=True, null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+

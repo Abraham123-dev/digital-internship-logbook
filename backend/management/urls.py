@@ -4,6 +4,10 @@ from . import views
 
 
 urlpatterns = [
+    path("notifications/", views.NotificationListView.as_view()),
+    path("notifications/<int:notification_id>/read/", views.NotificationReadView.as_view()),
+    path("notifications/read-all/", views.NotificationReadAllView.as_view()),
+
     path("coordinator/cohorts/", views.CoordinatorCohortView.as_view()),
     path("coordinator/cohorts/<int:cohort_id>/", views.CoordinatorCohortDetailView.as_view()),
     path("cohorts/current/", views.CurrentCohortView.as_view()),

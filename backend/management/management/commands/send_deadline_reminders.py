@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from backend.auth.email_service import EmailDeliveryError, send_email
 from backend.management.models import WeeklySubmission
+from backend.management.notifications import create_scheduled_notifications
 
 
 REMINDER_LEAD_TIME = timedelta(hours=24)
@@ -13,10 +14,11 @@ RUN_WINDOW = timedelta(minutes=5)
 
 
 class Command(BaseCommand):
-    help = "Email students a reminder about logbook weeks due in 24 hours."
+    help = "Send deadline reminder emails and create scheduled in-app logbook notifications."
 
     def handle(self, *args, **options):
         now = timezone.now()
+        scheduled_notifications = create_scheduled_notifications(now)
         earliest_deadline = now + REMINDER_LEAD_TIME - RUN_WINDOW
         latest_deadline = now + REMINDER_LEAD_TIME + RUN_WINDOW
 
@@ -58,4 +60,7 @@ class Command(BaseCommand):
             week.save(update_fields=["reminder_sent_for"])
             sent += 1
 
-        self.stdout.write(self.style.SUCCESS(f"Sent {sent} reminder(s); {failed} failed."))
+        self.stdout.write(self.style.SUCCESS(
+            f"Sent {sent} deadline reminder email(s); {failed} failed. "
+            f"Created {scheduled_notifications} scheduled in-app reminder(s)."
+        ))

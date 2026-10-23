@@ -6,6 +6,7 @@ from .models import (
     Cohort,
     CohortHoliday,
     EntryReview,
+    InAppNotification,
     LogbookEntry,
     SupervisorDetails,
     SupervisorReview,
@@ -84,6 +85,23 @@ class CohortSerializer(serializers.ModelSerializer):
                 if day not in existing_dates
             ])
         return instance
+
+
+class InAppNotificationSerializer(serializers.ModelSerializer):
+    id = serializers.SerializerMethodField()
+    isRead = serializers.BooleanField(source="is_read", read_only=True)
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+    linkTo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InAppNotification
+        fields = ["id", "trigger", "message", "isRead", "createdAt", "linkTo"]
+
+    def get_id(self, notification):
+        return str(notification.pk)
+
+    def get_linkTo(self, notification):
+        return notification.link_to or None
 
 
 class CohortHolidaySerializer(serializers.ModelSerializer):

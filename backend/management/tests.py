@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from io import StringIO
 from unittest.mock import patch
 
@@ -9,7 +9,8 @@ from django.core.management import call_command
 from rest_framework.test import APIClient
 
 from backend.auth.models import CoordinatorProfile, Department, LogrAccount, Programme, StudentProfile
-from .models import Cohort, ExtensionRequest, SupervisorDetails, WeeklySubmission
+from .models import Cohort, ExtensionRequest, InAppNotification, SupervisorDetails, WeeklySubmission
+from .notifications import create_scheduled_notifications
 from .views import assign_students
 
 
@@ -154,6 +155,10 @@ class CohortAssignmentTests(TestCase):
         self.assertEqual(response.status_code, 201)
 
         extension = ExtensionRequest.objects.get(week=week)
+        self.assertTrue(InAppNotification.objects.filter(
+            user=self.user,
+            trigger=InAppNotification.Trigger.EXTENSION_REQUESTED,
+        ).exists())
         coordinator_client = APIClient()
         coordinator_client.force_authenticate(self.user)
         response = coordinator_client.post(
@@ -167,6 +172,10 @@ class CohortAssignmentTests(TestCase):
         extension.refresh_from_db()
         self.assertEqual(extension.status, ExtensionRequest.Status.APPROVED)
         self.assertIsNotNone(week.extended_until)
+        self.assertTrue(InAppNotification.objects.filter(
+            user=student.user,
+            trigger=InAppNotification.Trigger.EXTENSION_APPROVED,
+        ).exists())
 
     def test_verified_signup_attaches_student_to_matching_cohort(self):
         pending_user = LogrAccount.objects.create_user(
@@ -215,3 +224,80 @@ class CohortAssignmentTests(TestCase):
         self.assertEqual(send_email.call_count, 1)
         week = WeeklySubmission.objects.get(student=student)
         self.assertIsNotNone(week.reminder_sent_for)
+
+    def test_notifications_can_be_listed_and_marked_read_only_by_their_owner(self):
+        own = InAppNotification.objects.create(
+            user=self.user,
+            trigger=InAppNotification.Trigger.WEEK_SUBMITTED_COORDINATOR,
+            message="Week submitted.",
+            link_to="/coordinator/students/1",
+        )
+        InAppNotification.objects.create(
+            user=self.user,
+            trigger=InAppNotification.Trigger.EXTENSION_REQUESTED,
+            message="Extension requested.",
+        )
+        other_user = LogrAccount.objects.create_user("other@example.com", "pass")
+        other_notification = InAppNotification.objects.create(
+            user=other_user,
+            trigger=InAppNotification.Trigger.WEEK_RETURNED,
+            message="Your week was returned.",
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.user)
+        response = client.get("/api/v1/notifications/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["unreadCount"], 2)
+        self.assertEqual(len(response.data["results"]), 2)
+        self.assertIn(str(own.pk), [item["id"] for item in response.data["results"]])
+
+        response = client.post(f"/api/v1/notifications/{own.pk}/read/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["isRead"])
+
+        response = client.post("/api/v1/notifications/read-all/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["updated"], 1)
+
+        other_client = APIClient()
+        other_client.force_authenticate(self.user)
+        response = other_client.post(f"/api/v1/notifications/{other_notification.pk}/read/")
+        self.assertEqual(response.status_code, 404)
+        other_notification.refresh_from_db()
+        self.assertFalse(other_notification.is_read)
+
+    def test_scheduled_logbook_notifications_are_created_once(self):
+        today = timezone.localdate()
+        days_until_friday = (4 - today.weekday()) % 7 or 7
+        friday = today + timedelta(days=days_until_friday)
+        saturday = friday + timedelta(days=1)
+        deadline = timezone.make_aware(datetime.combine(saturday, time(23, 59)))
+        student = self.make_student("scheduled@example.com", self.department)
+        week = WeeklySubmission.objects.create(
+            student=student,
+            cohort=self.cohort,
+            week_no=1,
+            deadline_at=deadline,
+        )
+
+        friday_afternoon = timezone.make_aware(datetime.combine(friday, time(15, 2)))
+        self.assertEqual(create_scheduled_notifications(friday_afternoon), 1)
+        self.assertEqual(create_scheduled_notifications(friday_afternoon), 0)
+        self.assertEqual(InAppNotification.objects.filter(
+            user=student.user,
+            trigger=InAppNotification.Trigger.WEEK_UNSUBMITTED_FRIDAY,
+        ).count(), 1)
+
+        after_deadline = deadline + timedelta(minutes=5)
+        create_scheduled_notifications(after_deadline)
+        self.assertEqual(InAppNotification.objects.filter(
+            user=student.user,
+            trigger=InAppNotification.Trigger.WEEK_LOCKED,
+        ).count(), 1)
+        create_scheduled_notifications(after_deadline)
+        week.refresh_from_db()
+        self.assertEqual(InAppNotification.objects.filter(
+            user=student.user,
+            trigger=InAppNotification.Trigger.WEEK_LOCKED,
+        ).count(), 1)

@@ -26,6 +26,7 @@ from .models import (
     Cohort,
     EntryReview,
     ExtensionRequest,
+    InAppNotification,
     LogbookEntry,
     LogbookPhoto,
     SupervisorDetails,
@@ -43,12 +44,14 @@ from .serializers import (
     DayEntrySerializer,
     ExtensionDecisionSerializer,
     ExtensionRequestSerializer,
+    InAppNotificationSerializer,
     EntryReviewSerializer,
     ProgrammeSerializer,
     ReturnWeekSerializer,
     SupervisorDetailsSerializer,
     SupervisorReviewSubmitSerializer,
 )
+from .notifications import create_notification
 
 
 ATTENDANCE_CODE_PREFIX = "attendance-code-"
@@ -59,6 +62,10 @@ MAX_ATTENDANCE_ATTEMPTS = 5
 
 def server_time():
     return timezone.now().isoformat()
+
+
+def account_name(user):
+    return f"{user.first_name} {user.last_name}".strip()
 
 
 def supervisor_signature_url(review):
@@ -126,6 +133,41 @@ def record_audit(request, action, target, details=None):
         target_id=target.pk,
         details=details or {},
     )
+
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request):
+        notifications = request.user.notifications.all()
+        return Response({
+            "results": InAppNotificationSerializer(notifications, many=True).data,
+            "unreadCount": notifications.filter(is_read=False).count(),
+        })
+
+
+class NotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def post(self, request, notification_id):
+        notification = request.user.notifications.filter(pk=notification_id).first()
+        if not notification:
+            return api_error("not_found", "Notification was not found.", status.HTTP_404_NOT_FOUND)
+        if not notification.is_read:
+            notification.is_read = True
+            notification.save(update_fields=["is_read"])
+        return Response(InAppNotificationSerializer(notification).data)
+
+
+class NotificationReadAllView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def post(self, request):
+        updated = request.user.notifications.filter(is_read=False).update(is_read=True)
+        return Response({"updated": updated})
 
 
 def assign_students(cohort):
@@ -743,6 +785,15 @@ class StudentWeekView(APIView):
             week.save(update_fields=["status", "submitted_at", "correction_deadline"])
             week.entries.update(status=LogbookEntry.Status.SUBMITTED)
 
+        if student.coordinator:
+            create_notification(
+                student.coordinator.user,
+                InAppNotification.Trigger.WEEK_SUBMITTED_COORDINATOR,
+                f"{account_name(student.user)} submitted week {week.week_no} for review.",
+                link_to=f"/coordinator/students/{student.pk}",
+                dedupe_key=f"week_submitted:{week.pk}:{week.submitted_at.isoformat()}",
+            )
+
         return Response(StudentLogbookHomeView.week_payload(week))
 
 
@@ -773,6 +824,14 @@ class StudentExtensionRequestView(APIView):
             reason=serializer.validated_data["reason"],
         )
         record_audit(request, "EXTENSION_REQUESTED", extension)
+        if student.coordinator:
+            create_notification(
+                student.coordinator.user,
+                InAppNotification.Trigger.EXTENSION_REQUESTED,
+                f"{account_name(student.user)} requested an extension for week {week.week_no}.",
+                link_to="/coordinator/extensions",
+                dedupe_key=f"extension_requested:{extension.pk}",
+            )
         return Response({
             "id": extension.pk,
             "status": extension.status.lower(),
@@ -810,7 +869,7 @@ class CoordinatorExtensionDecisionView(APIView):
 
     def post(self, request, request_id):
         coordinator = get_coordinator(request.user)
-        extension = ExtensionRequest.objects.select_related("week__cohort").filter(
+        extension = ExtensionRequest.objects.select_related("week__cohort", "week__student__user").filter(
             pk=request_id,
             week__student__coordinator=coordinator,
             status=ExtensionRequest.Status.PENDING,
@@ -842,6 +901,23 @@ class CoordinatorExtensionDecisionView(APIView):
             "decision": extension.status,
             "approved_until": extension.approved_until.isoformat() if extension.approved_until else None,
         })
+        trigger = (
+            InAppNotification.Trigger.EXTENSION_APPROVED
+            if extension.status == ExtensionRequest.Status.APPROVED
+            else InAppNotification.Trigger.EXTENSION_DENIED
+        )
+        message = (
+            f"Your extension request for week {extension.week.week_no} was approved."
+            if extension.status == ExtensionRequest.Status.APPROVED
+            else f"Your extension request for week {extension.week.week_no} was denied."
+        )
+        create_notification(
+            extension.week.student.user,
+            trigger,
+            message,
+            link_to=f"/student/week/{extension.week.week_no}",
+            dedupe_key=f"extension_decided:{extension.pk}",
+        )
         return Response({
             "id": extension.pk,
             "status": extension.status.lower(),
@@ -1201,6 +1277,13 @@ class CoordinatorFinishWeekView(APIView):
         week.entries.update(status=LogbookEntry.Status.REVIEWED)
         week.save(update_fields=["status", "reviewed_at"])
         record_audit(request, "WEEK_REVIEW_FINISHED", week)
+        create_notification(
+            week.student.user,
+            InAppNotification.Trigger.WEEK_REVIEWED,
+            f"Your logbook for week {week.week_no} has been reviewed.",
+            link_to=f"/student/week/{week.week_no}",
+            dedupe_key=f"week_reviewed:{week.pk}:{week.reviewed_at.isoformat()}",
+        )
         return Response({"message": "Week review finished.", "status": "reviewed"})
 
 
@@ -1230,6 +1313,13 @@ class CoordinatorReturnWeekView(APIView):
         week.save(update_fields=["status", "returned_at", "correction_deadline", "return_comment"])
         week.entries.update(status=LogbookEntry.Status.RETURNED)
         record_audit(request, "WEEK_RETURNED", week, {"comment": serializer.validated_data["comment"]})
+        create_notification(
+            week.student.user,
+            InAppNotification.Trigger.WEEK_RETURNED,
+            f"Your logbook for week {week.week_no} was returned for corrections.",
+            link_to=f"/student/week/{week.week_no}",
+            dedupe_key=f"week_returned:{week.pk}:{week.returned_at.isoformat()}",
+        )
         return Response({
             "message": "Week returned to the student.",
             "correctionDeadline": week.correction_deadline.isoformat(),
@@ -1340,6 +1430,15 @@ class StudentSupervisorReviewView(APIView):
             SupervisorReviewToken.objects.create(review=review, token_hash=hashed_token)
             record_audit(request, "SUPERVISOR_REVIEW_SENT", review, {"week_numbers": [week.week_no for week in weeks]})
 
+        if student.coordinator:
+            create_notification(
+                student.coordinator.user,
+                InAppNotification.Trigger.SUPERVISOR_DETAILS_RECEIVED,
+                f"{account_name(student.user)} sent logbook weeks to supervisor {supervisor.name}.",
+                link_to=f"/coordinator/students/{student.pk}",
+                dedupe_key=f"supervisor_details_received:{review.pk}",
+            )
+
         link = f"{settings.FRONTEND_URL}/supervisor/review?token={raw_token}"
         try:
             send_email(
@@ -1351,7 +1450,7 @@ class StudentSupervisorReviewView(APIView):
                 send_email(
                     recipient=student.coordinator.user.email,
                     subject="Supervisor review requested",
-                    body=f"{student.user.get_full_name()} sent week(s) {[week.week_no for week in weeks]} to {supervisor.name}.",
+                    body=f"{account_name(student.user)} sent week(s) {[week.week_no for week in weeks]} to {supervisor.name}.",
                 )
         except EmailDeliveryError:
             return api_error("email_delivery_failed", "The review batch was created, but an email could not be sent.", status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -1486,6 +1585,21 @@ class SupervisorReviewView(APIView):
         token.used_at = timezone.now()
         token.save(update_fields=["used_at"])
         record_audit(request, "SUPERVISOR_REVIEW_SUBMITTED", review)
+        create_notification(
+            review.student.user,
+            InAppNotification.Trigger.SUPERVISOR_REVIEW_SUBMITTED,
+            f"Supervisor {review.name_snapshot} submitted a review of your logbook.",
+            link_to="/student/reviews",
+            dedupe_key=f"supervisor_review_submitted:student:{review.pk}",
+        )
+        if review.student.coordinator:
+            create_notification(
+                review.student.coordinator.user,
+                InAppNotification.Trigger.SUPERVISOR_REVIEW_SUBMITTED,
+                f"Supervisor review for {review.student.matric_no} has been submitted.",
+                link_to=f"/coordinator/students/{review.student_id}",
+                dedupe_key=f"supervisor_review_submitted:coordinator:{review.pk}",
+            )
 
         try:
             send_email(
