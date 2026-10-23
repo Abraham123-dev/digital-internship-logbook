@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Role } from "@/types/auth";
 
-// TODO: confirm cookie name with backend partner before first integration.
 const SESSION_COOKIE = "logr_session";
 
 const ROLE_HOME: Record<Role, string> = {
@@ -18,18 +17,18 @@ const PROTECTED: Array<{ prefix: string; role: Role }> = [
 
 const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/accept-invite"];
 
-function decodeJwtRole(token: string): Role | null {
+function decodeJwtRole(token?: string): Role | null {
+  if (!token) return null;
   try {
     const segment = token.split(".")[1];
-    // JWT payload is base64url-encoded, not base64.
-    // Replace base64url chars before decoding and add padding.
-    const base64 = segment.replace(/-/g, "+").replace(/_/g, "/").padEnd(
-      segment.length + ((4 - (segment.length % 4)) % 4),
-      "="
-    );
+    if (!segment) return null;
+    const base64 = segment
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(segment.length + ((4 - (segment.length % 4)) % 4), "=");
     const payload = JSON.parse(atob(base64)) as { role?: string };
     const role = payload.role;
-    if (role === "student" || role === "coordinator" || role === "admin") return role;
+    if (role === "student" || role === "coordinator" || role === "admin") return role as Role;
     return null;
   } catch {
     return null;
@@ -37,14 +36,20 @@ function decodeJwtRole(token: string): Role | null {
 }
 
 export function middleware(req: NextRequest) {
+  // ── DEV PREVIEW MODE ─────────────────────────────────────────────────────────
+  // Auth guards are bypassed so all pages can be visited at their direct URLs.
+  // To restore production auth: delete the next line only.
+  return NextResponse.next();
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // eslint-disable-next-line no-unreachable
   const { pathname } = req.nextUrl;
 
-  // Supervisor pages are token-authenticated; handled entirely by the page.
   if (pathname.startsWith("/supervisor")) return NextResponse.next();
   if (pathname === "/admin/login") return NextResponse.next();
 
-  const cookie = req.cookies.get(SESSION_COOKIE);
-  const role = cookie ? decodeJwtRole(cookie.value) : null;
+  const cookieVal = req.cookies.get(SESSION_COOKIE)?.value;
+  const role = cookieVal ? decodeJwtRole(cookieVal) : null;
 
   for (const { prefix, role: required } of PROTECTED) {
     if (!pathname.startsWith(prefix)) continue;
@@ -56,14 +61,14 @@ export function middleware(req: NextRequest) {
     }
 
     if (role !== required) {
-      return NextResponse.redirect(new URL(ROLE_HOME[role], req.url));
+      return NextResponse.redirect(new URL(ROLE_HOME[role as Role], req.url));
     }
 
     return NextResponse.next();
   }
 
   if (PUBLIC_PATHS.includes(pathname) && role) {
-    return NextResponse.redirect(new URL(ROLE_HOME[role], req.url));
+    return NextResponse.redirect(new URL(ROLE_HOME[role as Role], req.url));
   }
 
   return NextResponse.next();

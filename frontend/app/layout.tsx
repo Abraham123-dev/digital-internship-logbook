@@ -1,20 +1,19 @@
-// Root layout — wraps all routes.
-// Sets up fonts, global providers (QueryClient, Auth), and base HTML structure.
-// Do not add page-specific UI here.
-
 import type { Metadata } from "next";
-import { Inter, Geist } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Logr — Digital Internship Logbook",
   description:
-    "Logr is the official digital internship logbook system for SWEP and SIWES students at OAU Faculty of Engineering.",
+    "Official digital logbook for SWEP & SIWES engineering students. Daily logs, weekly submissions, coordinator grading, and external supervisor verification.",
 };
 
 export default function RootLayout({
@@ -23,8 +22,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body>{children}</body>
+    <html lang="en" className={cn("font-sans", plusJakartaSans.variable)}>
+      <body className="font-sans antialiased text-[#0F172A] bg-white selection:bg-[#6366F1] selection:text-white">
+        {children}
+      </body>
     </html>
   );
 }

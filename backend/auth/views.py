@@ -229,6 +229,13 @@ class LoginView(APIView):
             if is_student and not user.studentprofile.email_verified:
                 return error("email_not_verified", "Verify your email before signing in.", 403)
         refresh = RefreshToken.for_user(user)
+        if user.is_superuser:
+            role_claim = "admin"
+        elif CoordinatorProfile.objects.filter(user=user).exists():
+            role_claim = "coordinator"
+        else:
+            role_claim = "student"
+        refresh["role"] = role_claim
         return Response({
                 "message": "Login successful",
                 "username": user.first_name,
@@ -286,6 +293,13 @@ class RefreshView(APIView):
         if not user.is_active:
             return error("account_deactivated", "This account is inactive.", 403)
         new_refresh = RefreshToken.for_user(user)
+        if user.is_superuser:
+            role_claim = "admin"
+        elif CoordinatorProfile.objects.filter(user=user).exists():
+            role_claim = "coordinator"
+        else:
+            role_claim = "student"
+        new_refresh["role"] = role_claim
         return Response({
             "server_time": current_time(),
             "access": str(new_refresh.access_token),
@@ -516,6 +530,7 @@ class AcceptInvitationView(APIView):
         except IntegrityError:
             return error("invitation_used", "Invitation has already been used.", 409)
         refresh = RefreshToken.for_user(user)
+        refresh["role"] = "coordinator"
         return Response({
             "server_time": current_time(),
             "user": user_response(user),
