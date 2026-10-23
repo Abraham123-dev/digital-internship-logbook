@@ -302,6 +302,32 @@ The signature pad should be a browser canvas. The supervisor can draw with a mou
 
 Token errors include `token_invalid`, `token_expired`, `already_submitted`, and `throttled`. Students receive `nothing_to_send` when there are no eligible weeks.
 
+### In-app notifications
+
+Notifications belong to the signed-in account. Use the access token for these endpoints; each user only receives their own notifications. `GET /notifications/` returns notifications newest first and an unread count:
+
+```json
+{
+  "results": [
+    {
+      "id": "12",
+      "trigger": "extension_approved",
+      "message": "Your extension request for week 2 was approved.",
+      "isRead": false,
+      "createdAt": "2026-10-23T14:00:00+01:00",
+      "linkTo": "/student/week/2"
+    }
+  ],
+  "unreadCount": 1
+}
+```
+
+Call `POST /notifications/{id}/read/` when the user marks one notification as read; the response is that notification with `isRead: true`. Call `POST /notifications/read-all/` to mark all of the signed-in account's unread notifications as read; success returns `{ "updated": 3 }`. Trying to mark another account's notification as read returns `not_found` (`404`).
+
+Trigger values are `week_unsubmitted_friday`, `week_unsubmitted_saturday`, `week_locked`, `week_submitted_coordinator`, `extension_requested`, `extension_approved`, `extension_denied`, `week_returned`, `week_reviewed`, `supervisor_details_received`, and `supervisor_review_submitted`.
+
+In-app notifications are created when a week is submitted, an extension is requested or decided, a coordinator returns or finishes reviewing a week, supervisor details are sent, or a supervisor review is submitted. The scheduled reminder command also creates unsubmitted-week notifications on Friday at 3:00 p.m. and Saturday at 6:00 p.m. Africa/Lagos time, and a week-locked notification after its effective deadline. The command must run every five minutes for those checks. Email delivery remains a separate channel.
+
 ### Admin
 
 Every admin route requires a superuser access token.

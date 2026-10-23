@@ -225,13 +225,14 @@ These endpoints are implemented in `backend/management/urls.py` and use `/api/v1
 | Student logbook | `GET /student/logbook/`, `GET/POST /student/logbook/weeks/{week_no}/`, `POST /student/logbook/weeks/{week_no}/extension-request/`, `GET/PUT /student/logbook/days/{date}/`, `POST /student/logbook/days/{date}/photos/` |
 | Coordinator review | `GET /coordinator/dashboard/`, `GET /coordinator/students/`, `GET /coordinator/weeks/{id}/`, `PUT /coordinator/entries/{id}/review/`, `POST /coordinator/weeks/{id}/finish/` or `/return/` |
 | Supervisor review | `GET/POST /student/supervisor-reviews/`, `GET/POST /supervisor/review/` with `X-Supervisor-Token` |
+| In-app notifications | `GET /notifications/`, `POST /notifications/{id}/read/`, `POST /notifications/read-all/` |
 | Admin | `GET /admin/overview/`, `GET /admin/users/`, `PATCH /admin/users/{id}/status/`, `POST /admin/coordinators/{id}/reassign/`, `GET /admin/reports/`, `GET /admin/audit-logs/` |
 
 Responses and request bodies for all management routes, status values, multipart photo upload, and common error codes are in [FRONTEND_GUIDE.md](FRONTEND_GUIDE.md#cohorts-attendance-logbook-review-and-admin). Cloudinary media needs `CLOUDINARY_URL` set on the server. Install dependencies with `pip install -r requirements.txt`, then apply the auth and management migrations using `python manage.py migrate`.
 
 ### Scheduled deadline reminders
 
-The `send_deadline_reminders` Django management command sends one reminder when an open logbook week is due in about 24 hours. Run it every five minutes so it can find the reminder window and retry temporary Gmail failures. It records the deadline already reminded for, so repeated scheduler runs do not send duplicates. If a coordinator approves a new extension deadline, the student can receive a reminder for that updated deadline as well.
+The `send_deadline_reminders` Django management command sends one email reminder when an open logbook week is due in about 24 hours. It also creates Friday 3:00 p.m. and Saturday 6:00 p.m. Africa/Lagos in-app reminders for unsubmitted weeks due that day, plus an in-app notice after an open week's effective deadline passes. Run it every five minutes. Notification API details and response formats are in [FRONTEND_GUIDE.md](FRONTEND_GUIDE.md#in-app-notifications).
 
 For the exact Render environment variables, migration steps, Cron Job settings, and verification commands, follow [DEPLOYMENT_TO_DO.md](DEPLOYMENT_TO_DO.md).
 

@@ -4,7 +4,7 @@ This checklist sets up the Django API and the 24-hour logbook deadline reminder 
 
 ## 1. Prepare the project
 
-- Push the latest project code to the Git branch Render will deploy. This includes `send_deadline_reminders` and migration `0005_weeklysubmission_reminder_sent_for`.
+- Push the latest project code to the Git branch Render will deploy. This includes `send_deadline_reminders` and migration `0006_inappnotification`.
 - Confirm `requirements.txt` is in the repository root with the Cloudinary dependency.
 - Do not commit `.env`, Gmail OAuth credentials, `CLOUDINARY_URL`, or other secrets. Add secrets in the Render dashboard.
 
@@ -82,7 +82,7 @@ In the Render dashboard:
 6. Add the cron job's environment variables. At minimum, copy the same `SECRET_KEY`, `DATABASE_URL`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_SENDER_EMAIL`, and `GMAIL_TOKEN_URI` values used by the web service. The simplest way to keep them synchronized is to use a Render Environment Group shared by both services. The cron job does not need `CLOUDINARY_URL` for reminders, but the web service does for media uploads.
 7. Save and deploy the Cron Job.
 
-The schedule expression is UTC. `*/5 * * * *` means run every five minutes. The command checks for open logbook weeks whose effective deadline is within a ten-minute window around 24 hours from its run time. Running every five minutes lets it catch that window closely. Render runs the command and stops the job when the command exits; no always-running worker is needed. See [Render Cron Jobs documentation](https://render.com/docs/cronjobs).
+The schedule expression is UTC. `*/5 * * * *` means run every five minutes. The command checks for open logbook weeks whose effective deadline is within a ten-minute window around 24 hours from its run time. It also creates Friday 3:00 p.m. and Saturday 6:00 p.m. Africa/Lagos in-app reminders and notices when an open week's effective deadline has passed. Running every five minutes catches these checks and the email reminder window; repeated runs do not duplicate in-app notices. Render runs the command and stops the job when the command exits; no always-running worker is needed. See [Render Cron Jobs documentation](https://render.com/docs/cronjobs).
 
 ## 5. Check the setup
 
