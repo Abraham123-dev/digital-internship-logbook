@@ -213,6 +213,35 @@ Request: `{ "current_password": "...", "new_password": "..." }`. Requires an acc
 
 - The app uses a small custom `LogrAccount` with email as the login field. It uses Django's `AbstractBaseUser` only for password handling; it does not use `PermissionsMixin` or a custom permission system. Student and coordinator data live in two small profile models.
 - OTP is generated with Python's `secrets` module and stored as a six-digit string in Django cache. Cache TTL gives it a ten-minute lifetime; verification compares the submitted code directly. No OTP hash or separate OTP model is used.
+
+## Cohorts, attendance, logbook review, and admin
+
+These endpoints are implemented in `backend/management/urls.py` and use `/api/v1/`. Protected routes require the JSON Bearer access token. Coordinators create cohorts; eligible students are attached automatically using department and programme. SWEP students use short-lived attendance codes. Coordinators grade entries; SIWES supervisor reviews use one-use email-link tokens and contain no numeric score.
+
+| Feature | Main routes |
+| --- | --- |
+| Cohorts | `POST /coordinator/cohorts/`, `PATCH /coordinator/cohorts/{id}/`, `GET /cohorts/current/`, `GET/PATCH /admin/cohorts/` |
+| Attendance | `POST /coordinator/attendance/sessions/`, `GET /coordinator/attendance/sessions/current/`, `POST /student/attendance/`, `GET /student/attendance/history/` |
+| Student logbook | `GET /student/logbook/`, `GET/POST /student/logbook/weeks/{week_no}/`, `POST /student/logbook/weeks/{week_no}/extension-request/`, `GET/PUT /student/logbook/days/{date}/`, `POST /student/logbook/days/{date}/photos/` |
+| Coordinator review | `GET /coordinator/dashboard/`, `GET /coordinator/students/`, `GET /coordinator/weeks/{id}/`, `PUT /coordinator/entries/{id}/review/`, `POST /coordinator/weeks/{id}/finish/` or `/return/` |
+| Supervisor review | `GET/POST /student/supervisor-reviews/`, `GET/POST /supervisor/review/` with `X-Supervisor-Token` |
+| Admin | `GET /admin/overview/`, `GET /admin/users/`, `PATCH /admin/users/{id}/status/`, `POST /admin/coordinators/{id}/reassign/`, `GET /admin/reports/`, `GET /admin/audit-logs/` |
+
+Responses and request bodies for all management routes, status values, multipart photo upload, and common error codes are in [FRONTEND_GUIDE.md](FRONTEND_GUIDE.md#cohorts-attendance-logbook-review-and-admin). Cloudinary media needs `CLOUDINARY_URL` set on the server. Install dependencies with `pip install -r requirements.txt`, then apply the auth and management migrations using `python manage.py migrate`.
+
+### Scheduled deadline reminders
+
+The `send_deadline_reminders` Django management command sends one reminder when an open logbook week is due in about 24 hours. Run it every five minutes so it can find the reminder window and retry temporary Gmail failures. It records the deadline already reminded for, so repeated scheduler runs do not send duplicates. If a coordinator approves a new extension deadline, the student can receive a reminder for that updated deadline as well.
+
+For the exact Render environment variables, migration steps, Cron Job settings, and verification commands, follow [DEPLOYMENT_TO_DO.md](DEPLOYMENT_TO_DO.md).
+
+On Windows Task Scheduler, create a task that repeats every five minutes. Set **Program/script** to the project's virtual-environment Python executable, **Add arguments** to `manage.py send_deadline_reminders`, and **Start in** to the project folder. On a Linux host with cron, use:
+
+```cron
+*/5 * * * * cd /path/to/digital-internship-logbook && /path/to/venv/bin/python manage.py send_deadline_reminders
+```
+
+The scheduler runs the command; no Celery worker or Redis service is needed. Keep it enabled on only one scheduler instance to avoid simultaneous runs.
 - Password reset uses Django's `default_token_generator`; there is no password-reset-token model.
 - Coordinator invitation tokens are random and single use, with a 72-hour expiry. The raw token is stored on the invitation row for straightforward lookup. Anyone with database read access could use a still-pending invitation; storing only a hash would reduce that risk but add another step to teach and maintain.
 - Passwords are saved through Django's `create_user()` and `set_password()`, using Django's default PBKDF2 hasher. No Argon2 or Resend.com is used.
