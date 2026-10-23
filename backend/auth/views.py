@@ -86,7 +86,12 @@ def user_response(user):
             "matric_no": student.matric_no,
             "department": {"id": student.department_id, "name": student.department.name},
             "programme": student.programme,
-            "cohort": None,
+            "cohort": {
+                "id": student.cohort_id,
+                "session": student.cohort.session,
+                "start_date": student.cohort.start_date.isoformat(),
+                "end_date": student.cohort.end_date.isoformat(),
+            } if student.cohort else None,
         }
     else:
         role, profile = "UNKNOWN", None
@@ -169,13 +174,24 @@ class VerifyOTPView(APIView):
             with transaction.atomic():
                 user = LogrAccount.objects.get(email__iexact=email, is_active=False)
                 department = Department.objects.get(pk=pending_signup["department_id"])
-                StudentProfile.objects.create(
+                profile = StudentProfile.objects.create(
                     user=user,
                     matric_no=pending_signup["matric_no"],
                     department=department,
                     programme=pending_signup["programme"],
                     email_verified=True,
                 )
+                from backend.management.models import Cohort
+
+                cohort = Cohort.objects.filter(
+                    department=department,
+                    programme=profile.programme,
+                    end_date__gte=timezone.localdate(),
+                ).order_by("start_date").first()
+                if cohort:
+                    profile.cohort = cohort
+                    profile.coordinator = cohort.coordinator
+                    profile.save(update_fields=["cohort", "coordinator"])
                 user.is_active = True
                 user.save(update_fields=["is_active"])
         except (LogrAccount.DoesNotExist, Department.DoesNotExist):
@@ -519,6 +535,7 @@ class AcceptInvitationView(APIView):
                     password=serializer.validated_data["password"],
                     first_name=serializer.validated_data["first_name"],
                     last_name=serializer.validated_data["last_name"],
+                    role=LogrAccount.Role.COORDINATOR,
                 )
                 CoordinatorProfile.objects.create(
                     user=user,
