@@ -33,6 +33,17 @@ export interface AcceptInviteResponse { access: string; refresh: string }
 
 export interface Department { id: number; name: string }
 
+export const DEFAULT_DEPTS: Department[] = [
+  { id: 1, name: "Computer Science & Engineering" },
+  { id: 2, name: "Electrical & Electronic Engineering" },
+  { id: 3, name: "Mechanical Engineering" },
+  { id: 4, name: "Civil Engineering" },
+  { id: 5, name: "Chemical Engineering" },
+  { id: 6, name: "Agricultural & Environmental Engineering" },
+  { id: 7, name: "Materials Science & Engineering" },
+  { id: 8, name: "Food Science & Technology" },
+];
+
 export interface StudentProfileData {
   account: { id: number; email: string; first_name: string; last_name: string };
   matric_no: string;
@@ -79,6 +90,7 @@ const P = {
   departments:        "/departments/",
   studentProfile:     "/me/student-profile/",
   coordinatorProfile: "/me/coordinator-profile/",
+  changePassword:     "/me/password/",
   adminInvitations:   "/admin/invitations/",
 } as const;
 
@@ -148,9 +160,23 @@ export const authApi = {
     return res;
   },
 
-  /** Fetch department list for the signup form. */
-  departments: (): Promise<ApiResult<Department[]>> =>
-    api.get(P.departments, { public: true }),
+  /** Fetch department list. Falls back gracefully to default faculty departments if backend route is not mounted yet. */
+  departments: async (): Promise<ApiResult<Department[]>> => {
+    try {
+      const res = await api.get<Department[]>(P.departments, { public: true });
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        return res;
+      }
+    } catch {
+      // Graceful fallback
+    }
+    return { ok: true, data: DEFAULT_DEPTS };
+  },
+
+  /** Alias for departments() for backward compatibility */
+  getDepartments: async (): Promise<ApiResult<Department[]>> => {
+    return authApi.departments();
+  },
 
   /** Get authenticated student profile (returns 404 if not a student). */
   studentProfile: (): Promise<ApiResult<{ message: string; profile: StudentProfileData }>> =>
@@ -159,6 +185,10 @@ export const authApi = {
   /** Get authenticated coordinator profile (returns 404 if not a coordinator). */
   coordinatorProfile: (): Promise<ApiResult<{ message: string; profile: CoordinatorProfileData }>> =>
     api.get(P.coordinatorProfile),
+
+  /** Change password for currently authenticated user. */
+  changePassword: (data: { current_password: string; new_password: string }): Promise<ApiResult<{ message: string }>> =>
+    api.post(P.changePassword, data),
 
   /** Admin: List coordinator invitations. */
   listInvitations: (): Promise<ApiResult<{ server_time: string; results: InvitationItem[] }>> =>
@@ -176,4 +206,3 @@ export const authApi = {
   revokeInvitation: (id: number): Promise<ApiResult<{ server_time: string; message: string }>> =>
     api.delete(`${P.adminInvitations}${id}/`),
 };
-

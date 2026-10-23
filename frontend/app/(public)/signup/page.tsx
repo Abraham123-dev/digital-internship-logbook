@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api/auth";
 import type { Department, StudentSignupPayload } from "@/lib/api/auth";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff } from "lucide-react";
 import { AuthBrandPanel, MobileAuthBar } from "@/components/auth/BrandPanel";
 
 /* ── Default OAU Tech departments fallback ────────────────── */
@@ -85,7 +85,7 @@ function OtpStep({ email, onVerified }: { email: string; onVerified: () => void 
           />
         </Field>
         <button type="submit" disabled={isPending || otp.length !== 6}
-          className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm">
+          className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm cursor-pointer">
           {isPending ? "Verifying…" : "Confirm email"}
         </button>
       </form>
@@ -94,7 +94,7 @@ function OtpStep({ email, onVerified }: { email: string; onVerified: () => void 
           <p className="text-[12px] text-[#7A7973]">{resendMsg}</p>
         ) : (
           <button onClick={() => { setError(null); setResendMsg(null); startResend(async () => { await authApi.resendOtp({ email }); setResendMsg("A new code was sent."); }); }}
-            disabled={isResending} className="text-[12px] font-semibold text-[#141414] hover:underline underline-offset-4 disabled:opacity-50">
+            disabled={isResending} className="text-[12px] font-semibold text-[#141414] hover:underline underline-offset-4 disabled:opacity-50 cursor-pointer">
             {isResending ? "Resending…" : "Didn't get the code? Resend"}
           </button>
         )}
@@ -140,6 +140,8 @@ export default function SignupPage() {
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState<Step>("form");
   const [form, setForm] = useState<FormState>(INITIAL);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [depts, setDepts] = useState<Department[]>(DEFAULT_DEPTS);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -268,15 +270,50 @@ export default function SignupPage() {
                 </select>
               </Field>
 
-              {/* Passwords */}
+              {/* Passwords with Eye Toggles */}
               <div className="grid grid-cols-2 gap-2.5">
                 <Field label="Password" id="password" error={fieldErrors.password}>
-                  <input id="password" type="password" value={form.password} onChange={(e) => set("password")(e.target.value)}
-                    autoComplete="new-password" placeholder="••••••••" className={inputCls(!!fieldErrors.password)} />
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={form.password}
+                      onChange={(e) => set("password")(e.target.value)}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      className={`${inputCls(!!fieldErrors.password)} pr-8.5`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-[#9A9990] hover:text-[#141414] transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    </button>
+                  </div>
                 </Field>
+
                 <Field label="Confirm" id="confirmPassword" error={fieldErrors.confirmPassword}>
-                  <input id="confirmPassword" type="password" value={form.confirmPassword} onChange={(e) => set("confirmPassword")(e.target.value)}
-                    autoComplete="new-password" placeholder="••••••••" className={inputCls(!!fieldErrors.confirmPassword)} />
+                  <div className="relative">
+                    <input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={form.confirmPassword}
+                      onChange={(e) => set("confirmPassword")(e.target.value)}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      className={`${inputCls(!!fieldErrors.confirmPassword)} pr-8.5`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-[#9A9990] hover:text-[#141414] transition-colors"
+                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showConfirmPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    </button>
+                  </div>
                 </Field>
               </div>
 
@@ -288,7 +325,7 @@ export default function SignupPage() {
               )}
 
               <button type="submit" disabled={isPending}
-                className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm">
+                className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm cursor-pointer">
                 {isPending ? "Creating account…" : "Create account"}
               </button>
             </form>

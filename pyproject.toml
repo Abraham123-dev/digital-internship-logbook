@@ -1,0 +1,11 @@
+[tool.pyrefly]
+venv = ".venv"
+search_paths = [".", "backend"]
+
+[tool.pyrefly.errors]
+missing-import = false
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = [".", "backend"]

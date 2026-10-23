@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, X } from "lucide-react";
 
-/* â”€â”€ data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── data ───────────────────────────────────────────── */
 
 const workflowPhases = [
   {
@@ -12,14 +12,14 @@ const workflowPhases = [
     title: "Document Work",
     summary: "Students write daily entries throughout their training period.",
     detail:
-      "Each entry captures what the student did that day â€” tasks completed, skills practised, observations made, and any problems encountered. Entries autosave continuously so nothing is lost. For SWEP students, daily attendance is verified here too using a short-lived coordinator-generated code.",
+      "Each entry captures what the student did that day — tasks completed, skills practised, observations made, and any problems encountered. Entries autosave continuously so nothing is lost. For SWEP students, daily attendance is verified here too using a short-lived coordinator-generated code.",
   },
   {
     num: "02",
     title: "Submit Work",
     summary: "Logbook records are submitted on a configured schedule.",
     detail:
-      "Coordinators define submission windows for each cohort. Students submit their accumulated entries within that window. For SIWES students, the submission is also forwarded to their industrial supervisor via a secure email link â€” no account required on the supervisor's end.",
+      "Coordinators define submission windows for each cohort. Students submit their accumulated entries within that window. For SIWES students, the submission is also forwarded to their industrial supervisor via a secure email link — no account required on the supervisor's end.",
   },
   {
     num: "03",
@@ -33,7 +33,7 @@ const workflowPhases = [
     title: "Assess Students",
     summary: "The department assigns formal grades and closes the record.",
     detail:
-      "After reviewing all submissions and feedback cycles, the coordinator assigns a final grade. Logr maintains a structured record of each student's assessment for Senate-approved reporting. Grading authority stays entirely with the department â€” supervisors cannot grade.",
+      "After reviewing all submissions and feedback cycles, the coordinator assigns a final grade. Logr maintains a structured record of each student's assessment for Senate-approved reporting. Grading authority stays entirely with the department — supervisors cannot grade.",
   },
 ];
 
@@ -62,7 +62,7 @@ const userRoles = [
   {
     role: "External Supervisor",
     tag: "SIWES Workplace Employer",
-    desc: "Receives a secure link by email, reads the student's submitted records, provides feedback, and signs off â€” no account or software installation required.",
+    desc: "Receives a secure link by email, reads the student's submitted records, provides feedback, and signs off — no account or software installation required.",
     link: "/login",
     linkText: "Supervisor link",
   },
@@ -110,7 +110,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-[#EDECE6] text-[#141414] font-sans selection:bg-[#F04D23] selection:text-white">
 
-      {/* â”€â”€ STICKY HEADER â”€â”€ */}
+      {/* ── STICKY HEADER ── */}
       <header className="sticky top-0 z-50 border-b border-[#D8D7CE] bg-[#EDECE6]/95 backdrop-blur-sm">
         <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 h-16 flex items-center justify-between">
 
@@ -147,13 +147,13 @@ export default function Home() {
         </div>
       </header>
 
-      {/* â”€â”€ MOBILE DRAWER BACKDROP â”€â”€ */}
+      {/* ── MOBILE DRAWER BACKDROP ── */}
       <div
         onClick={() => setMenuOpen(false)}
         className={`fixed inset-0 z-50 bg-black/20 backdrop-blur-[2px] transition-opacity duration-300 md:hidden ${menuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
       />
 
-      {/* â”€â”€ MOBILE DRAWER PANEL â”€â”€ */}
+      {/* ── MOBILE DRAWER PANEL ── */}
       <div className={`fixed top-0 right-0 bottom-0 z-50 w-[300px] bg-[#EDECE6] border-l border-[#D8D7CE] flex flex-col transition-transform duration-300 ease-out md:hidden ${menuOpen ? "translate-x-0" : "translate-x-full"}`}>
 
         <div className="h-16 flex items-center justify-between px-6 border-b border-[#D8D7CE]">
@@ -190,7 +190,7 @@ export default function Home() {
 
       <main className="flex-1">
 
-        {/* â”€â”€ HERO â”€â”€ */}
+        {/* ── HERO ── */}
         <section className="relative overflow-hidden border-b border-[#D8D7CE]">
           <div className="pointer-events-none select-none absolute right-0 bottom-0 w-[280px] sm:w-[420px] lg:w-[520px] h-[280px] sm:h-[420px] lg:h-[520px] opacity-[0.13] translate-x-1/3 translate-y-1/3">
             <CompassArc className="w-full h-full" />
@@ -200,7 +200,7 @@ export default function Home() {
 
             <div className="flex items-center gap-2 text-[11px] sm:text-[12px] font-medium text-[#141414] mb-7 sm:mb-10">
               <span className="size-1.5 rounded-full border-[1.5px] border-[#F04D23] shrink-0" />
-              <span>Obafemi Awolowo University &nbsp;Â·&nbsp; SWEP &amp; SIWES</span>
+              <span>Obafemi Awolowo University &nbsp;&middot;&nbsp; SWEP &amp; SIWES</span>
             </div>
 
             <h1 className="text-[1.85rem] sm:text-[2.8rem] lg:text-[3.8rem] xl:text-[4.5rem] font-extrabold tracking-[-0.035em] leading-[1.06] text-[#141414] max-w-3xl mb-5 sm:mb-7">
@@ -209,7 +209,7 @@ export default function Home() {
 
             <p className="text-[13px] sm:text-[15px] lg:text-[16px] text-[#5A5954] leading-relaxed max-w-lg mb-8 sm:mb-10">
               Students document practical training, submit records, and receive coordinator feedback.
-              Departments review, correct, and assess â€” all in one place.
+              Departments review, correct, and assess — all in one place.
             </p>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -228,9 +228,9 @@ export default function Home() {
             </div>
 
             <div className="mt-10 sm:mt-16 pt-5 border-t border-[#D0CFCE] flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-mono text-[#7A7973]">
-              <span>SWEP Â· On-Campus Training</span>
+              <span>SWEP · On-Campus Training</span>
               <span className="hidden sm:inline text-[#D0CFCE]">|</span>
-              <span>SIWES Â· Industrial Placement</span>
+              <span>SIWES · Industrial Placement</span>
               <span className="hidden sm:inline text-[#D0CFCE]">|</span>
               <a href="#workflow" className="text-[#141414] font-semibold hover:underline underline-offset-4 flex items-center gap-1">
                 See how it works <ArrowRight className="size-3" />
@@ -240,7 +240,7 @@ export default function Home() {
         </section>
 
 
-        {/* â”€â”€ WORKFLOW â”€â”€ */}
+        {/* ── WORKFLOW ── */}
         <section id="workflow" className="py-16 sm:py-24 border-b border-[#D8D7CE]">
           <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12">
 
@@ -252,7 +252,7 @@ export default function Home() {
               Four stages, one continuous record
             </h2>
             <p className="text-[13px] text-[#5A5954] mb-12 sm:mb-16 max-w-lg leading-relaxed">
-              Every activity in Logr maps to this progression â€” from the first daily entry to the final departmental grade.
+              Every activity in Logr maps to this progression — from the first daily entry to the final departmental grade.
             </p>
 
             {/* Timeline */}
@@ -278,7 +278,7 @@ export default function Home() {
         </section>
 
 
-        {/* â”€â”€ PROGRAMMES â”€â”€ */}
+        {/* ── PROGRAMMES ── */}
         <section id="programmes" className="border-b border-[#D8D7CE]">
           <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12">
             <div className="grid lg:grid-cols-[1fr_1px_1fr]">
@@ -331,7 +331,7 @@ export default function Home() {
                 <div className="space-y-3 mb-8">
                   {[
                     "Student sends records to their workplace supervisor via a secure email link",
-                    "Supervisor reviews and signs off â€” no account or software required",
+                    "Supervisor reviews and signs off — no account or software required",
                     "Formal grading remains the sole authority of the academic department",
                   ].map((item) => (
                     <div key={item} className="flex items-start gap-3 text-[12px] sm:text-[13px] text-[#3A3934]">
@@ -352,7 +352,7 @@ export default function Home() {
         </section>
 
 
-        {/* â”€â”€ ROLES â”€â”€ */}
+        {/* ── ROLES ── */}
         <section id="roles" className="py-16 sm:py-24">
           <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12">
 
@@ -385,7 +385,7 @@ export default function Home() {
       </main>
 
 
-      {/* â”€â”€ FOOTER â”€â”€ */}
+      {/* ── FOOTER ── */}
       <footer className="bg-[#141414] text-white">
         <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 py-10 sm:py-12">
 
@@ -395,7 +395,7 @@ export default function Home() {
                 <span className="size-2 rounded-full bg-[#F04D23]" />
                 <span className="text-[17px] font-extrabold tracking-[-0.03em]">Logr</span>
               </div>
-              <p className="text-[11px] text-white/40 font-mono">Digital Internship Logbook &amp; Assessment System Â· OAU</p>
+              <p className="text-[11px] text-white/40 font-mono">Digital Internship Logbook &amp; Assessment System · OAU</p>
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12px] text-white/60 font-medium">
               <Link href="/login" className="hover:text-white transition-colors">Sign in</Link>
@@ -407,8 +407,8 @@ export default function Home() {
           </div>
 
           <div className="pt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[10px] sm:text-[11px] text-white/30 font-mono">
-            <span>Obafemi Awolowo University Â· Faculty of Technology</span>
-            <span>SWEP &amp; SIWES Â· {new Date().getFullYear()}</span>
+            <span>Obafemi Awolowo University · Faculty of Technology</span>
+            <span>SWEP &amp; SIWES · {new Date().getFullYear()}</span>
           </div>
 
         </div>

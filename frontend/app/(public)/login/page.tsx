@@ -4,7 +4,7 @@ import { useState, useTransition, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authApi } from "@/lib/api/auth";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff } from "lucide-react";
 import { AuthBrandPanel, MobileAuthBar } from "@/components/auth/BrandPanel";
 
 function decodeRole(token: string): "student" | "coordinator" | "admin" | null {
@@ -27,6 +27,7 @@ function LoginForm() {
   const [isPending, startTransition] = useTransition();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
@@ -95,12 +96,25 @@ function LoginForm() {
                     Forgot password?
                   </Link>
                 </div>
-                <input
-                  id="password" type="password" value={password}
-                  onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
-                  placeholder="••••••••"
-                  className={`w-full h-9.5 px-3 rounded-xl border bg-white text-[13px] text-[#141414] placeholder:text-[#B0AFA9] outline-none transition-all focus:ring-2 focus:ring-[#F04D23]/20 focus:border-[#F04D23] ${error ? "border-red-400" : "border-[#D8D7CE] hover:border-[#B0AFA9]"}`}
-                />
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    className={`w-full h-9.5 pl-3 pr-10 rounded-xl border bg-white text-[13px] text-[#141414] placeholder:text-[#B0AFA9] outline-none transition-all focus:ring-2 focus:ring-[#F04D23]/20 focus:border-[#F04D23] ${error ? "border-red-400" : "border-[#D8D7CE] hover:border-[#B0AFA9]"}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#9A9990] hover:text-[#141414] transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
 
               {error && (
@@ -112,7 +126,7 @@ function LoginForm() {
 
               <button
                 type="submit" disabled={isPending}
-                className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm"
+                className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm cursor-pointer"
               >
                 {isPending ? "Signing in…" : "Sign in"}
               </button>

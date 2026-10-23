@@ -64,25 +64,31 @@ class LogrAccount(AbstractBaseUser):
 class Department(models.Model):
     """One shared department list keeps student and coordinator assignments consistent."""
 
+    id: int
     name = models.CharField(max_length=150, unique=True)
+    objects = models.Manager()
 
     def __str__(self):
         return self.name
 
 
 class StudentProfile(models.Model):
+    id: int
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     matric_no = models.CharField(max_length=40, unique=True)
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
     programme = models.CharField(max_length=10, choices=Programme.choices)
     email_verified = models.BooleanField(default=False)
+    objects = models.Manager()
 
 
 class CoordinatorProfile(models.Model):
+    id: int
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     phone = models.CharField(max_length=20)
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
     programme = models.CharField(max_length=10, choices=Programme.choices)
+    objects = models.Manager()
 
 class CoordinatorInvitation(models.Model):
     class Status(models.TextChoices):
@@ -91,6 +97,7 @@ class CoordinatorInvitation(models.Model):
         EXPIRED = "EXPIRED", "Expired"
         REVOKED = "REVOKED", "Revoked"
 
+    id: int
     email = models.EmailField()
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
     programme = models.CharField(max_length=10, choices=Programme.choices)
@@ -98,6 +105,7 @@ class CoordinatorInvitation(models.Model):
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(default=invitation_expiry)
+    objects = models.Manager()
 
     @property
     def is_expired(self):

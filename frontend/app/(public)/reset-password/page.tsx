@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition, useEffect, Suspense } from "react";
+import { useState, useTransition, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { authApi } from "@/lib/api/auth";
+import { Eye, EyeOff } from "lucide-react";
 
 function ResetPasswordForm() {
   const params = useSearchParams();
@@ -15,6 +16,8 @@ function ResetPasswordForm() {
 
   const [password,        setPassword]        = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword,    setShowPassword]    = useState(false);
+  const [showConfirm,     setShowConfirm]     = useState(false);
   const [error,           setError]           = useState<string | null>(null);
   const [fieldError,      setFieldError]      = useState<string | null>(null);
   const [done,            setDone]            = useState(false);
@@ -112,11 +115,25 @@ function ResetPasswordForm() {
                   className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
                   New password
                 </label>
-                <input
-                  id="password" type="password" value={password} autoComplete="new-password"
-                  onChange={(e) => setPassword(e.target.value)} placeholder="Minimum 8 characters"
-                  className={inputCls(!!fieldError)}
-                />
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    autoComplete="new-password"
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Minimum 8 characters"
+                    className={`${inputCls(!!fieldError)} pr-10`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#9A9990] hover:text-[#141414] transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-col gap-1">
@@ -124,11 +141,25 @@ function ResetPasswordForm() {
                   className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
                   Confirm password
                 </label>
-                <input
-                  id="confirmPassword" type="password" value={confirmPassword} autoComplete="new-password"
-                  onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••"
-                  className={inputCls(!!fieldError)}
-                />
+                <div className="relative">
+                  <input
+                    id="confirmPassword"
+                    type={showConfirm ? "text" : "password"}
+                    value={confirmPassword}
+                    autoComplete="new-password"
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className={`${inputCls(!!fieldError)} pr-10`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#9A9990] hover:text-[#141414] transition-colors"
+                    aria-label={showConfirm ? "Hide password" : "Show password"}
+                  >
+                    {showConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
                 {fieldError && <p className="text-[10.5px] text-red-500 font-medium">{fieldError}</p>}
               </div>
 
@@ -141,7 +172,7 @@ function ResetPasswordForm() {
 
               <button
                 type="submit" disabled={isPending}
-                className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm mt-1"
+                className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm mt-1 cursor-pointer"
               >
                 {isPending ? "Saving…" : "Set new password"}
               </button>

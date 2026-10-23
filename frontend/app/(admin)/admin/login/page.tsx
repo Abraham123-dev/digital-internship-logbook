@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api/auth";
-import { ArrowUpRight, Lock } from "lucide-react";
+import { ArrowUpRight, Lock, Eye, EyeOff } from "lucide-react";
 import { AuthBrandPanel, MobileAuthBar } from "@/components/auth/BrandPanel";
 
 export default function AdminLoginPage() {
@@ -12,6 +12,7 @@ export default function AdminLoginPage() {
   const [isPending, startTransition] = useTransition();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
@@ -38,31 +39,28 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[340px_1fr] xl:grid-cols-[380px_1fr] font-sans selection:bg-[#F04D23] selection:text-white">
 
-      {/* ── LEFT: Brand panel ────────────────────────────── */}
+      {/* Brand panel with "Admin Governance" flavour */}
       <AuthBrandPanel variant="admin" />
 
-      {/* ── RIGHT: Form panel ───────────────────────────── */}
+      {/* Right form panel */}
       <div className="min-h-screen bg-[#EDECE6] flex flex-col">
-        {/* Mobile logo bar */}
-        <MobileAuthBar
-          badge={
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-[#D8D7CE] bg-white text-[10px] font-mono text-[#7A7973]">
-              <Lock className="size-2.5" />
-              Admin
-            </span>
-          }
-        />
+        <MobileAuthBar />
 
         <div className="flex-1 flex items-center justify-center px-4 sm:px-8 py-8 sm:py-12">
           <div className="w-full max-w-[340px]">
 
-            {/* Heading */}
             <div className="mb-5">
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="size-2 rounded-full bg-[#141414]" />
+                <span className="text-[10.5px] font-mono uppercase tracking-wider font-semibold text-[#141414]">
+                  Institutional Admin Console
+                </span>
+              </div>
               <h1 className="text-[1.2rem] sm:text-[1.35rem] font-bold tracking-[-0.025em] text-[#141414] mb-1">
-                System Administration
+                Superuser Access
               </h1>
               <p className="text-[12px] sm:text-[12.5px] text-[#7A7973] leading-relaxed">
-                Sign in with superuser credentials to manage the platform.
+                Faculty of Technology governance and audit portal.
               </p>
             </div>
 
@@ -91,15 +89,27 @@ export default function AdminLoginPage() {
                     Forgot password?
                   </Link>
                 </div>
-                <input
-                  id="admin-password" type="password"
-                  autoComplete="current-password" value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className={`w-full h-9.5 px-3 rounded-xl border bg-white text-[13px] text-[#141414] placeholder:text-[#B0AFA9] outline-none transition-all
-                    focus:ring-2 focus:ring-[#F04D23]/20 focus:border-[#F04D23]
-                    ${error ? "border-red-400" : "border-[#D8D7CE] hover:border-[#B0AFA9]"}`}
-                />
+                <div className="relative">
+                  <input
+                    id="admin-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className={`w-full h-9.5 pl-3 pr-10 rounded-xl border bg-white text-[13px] text-[#141414] placeholder:text-[#B0AFA9] outline-none transition-all
+                      focus:ring-2 focus:ring-[#F04D23]/20 focus:border-[#F04D23]
+                      ${error ? "border-red-400" : "border-[#D8D7CE] hover:border-[#B0AFA9]"}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#9A9990] hover:text-[#141414] transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
 
               {error && (
@@ -111,7 +121,7 @@ export default function AdminLoginPage() {
 
               <button
                 type="submit" disabled={isPending}
-                className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm"
+                className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm cursor-pointer"
               >
                 {isPending ? "Authenticating…" : "Sign in to Admin Console"}
               </button>

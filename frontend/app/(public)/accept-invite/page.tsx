@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { authApi } from "@/lib/api/auth";
 import type { ValidateInviteResponse } from "@/lib/api/auth";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { AuthBrandPanel, MobileAuthBar } from "@/components/auth/BrandPanel";
 
 const inputCls = (hasErr?: boolean) =>
@@ -36,6 +36,8 @@ function AcceptInviteForm() {
   const [invite, setInvite] = useState<ValidateInviteResponse | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(INITIAL);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fieldErrs, setFieldErrs] = useState<Partial<Record<keyof FormState, string>>>({});
   const [globalErr, setGlobalErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -48,21 +50,21 @@ function AcceptInviteForm() {
       else {
         setLoadErr(
           res.message === "invitation_invalid"
-            ? "This invitation link is invalid, expired, or has already been used."
+            ? "This invitation link is invalid, expired, or already used."
             : res.message
         );
       }
     });
   }, [token]);
 
-  const set = (key: keyof FormState) => (val: string) => setForm((f) => ({ ...f, [key]: val }));
+  const set = (k: keyof FormState) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   function validate(): boolean {
     const e: Partial<Record<keyof FormState, string>> = {};
     if (!form.first_name.trim()) e.first_name = "Required.";
-    if (!form.last_name.trim()) e.last_name = "Required.";
-    if (!form.phone.trim()) e.phone = "Required.";
-    if (form.password.length < 8) e.password = "At least 8 characters.";
+    if (!form.last_name.trim())  e.last_name  = "Required.";
+    if (!form.phone.trim())      e.phone      = "Required.";
+    if (form.password.length < 8) e.password   = "Min 8 chars.";
     if (form.password !== form.confirmPassword) e.confirmPassword = "Passwords do not match.";
     setFieldErrs(e);
     return Object.keys(e).length === 0;
@@ -72,9 +74,16 @@ function AcceptInviteForm() {
     e.preventDefault();
     setGlobalErr(null);
     if (!validate()) return;
-    const { confirmPassword: _c, ...rest } = form;
+
     startTransition(async () => {
-      const res = await authApi.acceptInvite({ token, ...rest });
+      const res = await authApi.acceptInvite({
+        token,
+        first_name: form.first_name.trim(),
+        last_name:  form.last_name.trim(),
+        phone:      form.phone.trim(),
+        password:   form.password,
+      });
+
       if (!res.ok) {
         const map: Record<string, string> = {
           invitation_invalid: "This invitation link is no longer valid.",
@@ -139,110 +148,145 @@ function AcceptInviteForm() {
       <Layout>
         <div className="w-full max-w-[340px]">
           <div className="flex items-center gap-2 mb-4">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-              Account Created
-            </span>
+            <span className="size-1.5 rounded-full bg-[#F04D23]" />
+            <span className="text-[10px] font-medium text-[#141414]">Account created</span>
           </div>
           <h1 className="text-[1.2rem] sm:text-[1.35rem] font-bold tracking-[-0.025em] text-[#141414] mb-2">
-            Welcome, {form.first_name}
+            Welcome to Logr
           </h1>
           <p className="text-[12px] sm:text-[12.5px] text-[#7A7973] leading-relaxed mb-6">
-            Your coordinator account is ready. You&apos;re signed in and can access your portal now.
+            Your coordinator account is active. You can now access your department portal.
           </p>
           <Link href="/coordinator"
             className="inline-flex w-full items-center justify-center h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] transition-all shadow-sm">
-            Go to coordinator portal →
+            Open coordinator dashboard →
           </Link>
         </div>
       </Layout>
     );
   }
 
-  /* Accept form */
+  /* Form */
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[340px_1fr] xl:grid-cols-[380px_1fr] font-sans selection:bg-[#F04D23] selection:text-white">
-      <AuthBrandPanel variant="invite" inviteDetail={invite} />
-      <div className="min-h-screen bg-[#EDECE6] flex flex-col">
-        <MobileAuthBar />
-        <div className="flex-1 flex items-center justify-center px-4 sm:px-8 py-8 sm:py-12 overflow-y-auto">
-          <div className="w-full max-w-[340px]">
+    <Layout>
+      <div className="w-full max-w-[340px]">
 
-            <div className="mb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="size-1.5 rounded-full border-[1.5px] border-[#F04D23]" />
-                <span className="text-[10px] font-mono text-[#7A7973] uppercase tracking-wider">{invite!.department} · {invite!.programme}</span>
-              </div>
-              <h1 className="text-[1.2rem] sm:text-[1.35rem] font-bold tracking-[-0.025em] text-[#141414] mb-1">
-                Set up your account
-              </h1>
-              <p className="text-[12px] sm:text-[12.5px] text-[#7A7973] leading-relaxed">
-                Complete your coordinator profile to access your department portal.
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3">
-              {/* Email — read-only */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">Email address</label>
-                <div className="w-full h-9.5 px-3 flex items-center rounded-xl border border-[#D8D7CE] bg-[#F5F4F0] text-[13px] text-[#7A7973]">
-                  {invite!.email}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <Field label="First name" id="first_name" error={fieldErrs.first_name}>
-                  <input id="first_name" type="text" value={form.first_name}
-                    onChange={(e) => set("first_name")(e.target.value)}
-                    autoComplete="given-name" placeholder="Ada"
-                    className={inputCls(!!fieldErrs.first_name)} />
-                </Field>
-                <Field label="Last name" id="last_name" error={fieldErrs.last_name}>
-                  <input id="last_name" type="text" value={form.last_name}
-                    onChange={(e) => set("last_name")(e.target.value)}
-                    autoComplete="family-name" placeholder="Coordinator"
-                    className={inputCls(!!fieldErrs.last_name)} />
-                </Field>
-              </div>
-
-              <Field label="Phone number" id="phone" error={fieldErrs.phone}>
-                <input id="phone" type="tel" value={form.phone}
-                  onChange={(e) => set("phone")(e.target.value)}
-                  autoComplete="tel" placeholder="+2348000000000"
-                  className={inputCls(!!fieldErrs.phone)} />
-              </Field>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <Field label="Password" id="password" error={fieldErrs.password}>
-                  <input id="password" type="password" value={form.password}
-                    onChange={(e) => set("password")(e.target.value)}
-                    autoComplete="new-password" placeholder="••••••••"
-                    className={inputCls(!!fieldErrs.password)} />
-                </Field>
-                <Field label="Confirm" id="confirmPassword" error={fieldErrs.confirmPassword}>
-                  <input id="confirmPassword" type="password" value={form.confirmPassword}
-                    onChange={(e) => set("confirmPassword")(e.target.value)}
-                    autoComplete="new-password" placeholder="••••••••"
-                    className={inputCls(!!fieldErrs.confirmPassword)} />
-                </Field>
-              </div>
-
-              {globalErr && (
-                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
-                  <span className="mt-1 size-1.5 rounded-full bg-red-400 shrink-0" />
-                  <p className="text-[11.5px] text-red-600 leading-relaxed">{globalErr}</p>
-                </div>
-              )}
-
-              <button type="submit" disabled={isPending}
-                className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm">
-                {isPending ? "Setting up account…" : "Create coordinator account"}
-              </button>
-            </form>
+        {/* Heading */}
+        <div className="mb-5">
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="size-1.5 rounded-full bg-[#F04D23]" />
+            <span className="text-[10.5px] font-mono uppercase tracking-wider text-[#7A7973]">
+              {invite?.department} &middot; {invite?.programme}
+            </span>
           </div>
+          <h1 className="text-[1.2rem] sm:text-[1.35rem] font-bold tracking-[-0.025em] text-[#141414] mb-1">
+            Accept coordinator role
+          </h1>
+          <p className="text-[12px] sm:text-[12.5px] text-[#7A7973] leading-relaxed">
+            Complete your coordinator profile to access your department portal.
+          </p>
         </div>
+
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3">
+          {/* Email — read-only */}
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">Email address</label>
+            <div className="w-full h-9.5 px-3 flex items-center rounded-xl border border-[#D8D7CE] bg-[#F5F4F0] text-[13px] text-[#7A7973]">
+              {invite!.email}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field label="First name" id="first_name" error={fieldErrs.first_name}>
+              <input id="first_name" type="text" value={form.first_name}
+                onChange={(e) => set("first_name")(e.target.value)}
+                autoComplete="given-name" placeholder="Ada"
+                className={inputCls(!!fieldErrs.first_name)} />
+            </Field>
+            <Field label="Last name" id="last_name" error={fieldErrs.last_name}>
+              <input id="last_name" type="text" value={form.last_name}
+                onChange={(e) => set("last_name")(e.target.value)}
+                autoComplete="family-name" placeholder="Coordinator"
+                className={inputCls(!!fieldErrs.last_name)} />
+            </Field>
+          </div>
+
+          <Field label="Phone number" id="phone" error={fieldErrs.phone}>
+            <input id="phone" type="tel" value={form.phone}
+              onChange={(e) => set("phone")(e.target.value)}
+              autoComplete="tel" placeholder="+2348000000000"
+              className={inputCls(!!fieldErrs.phone)} />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field label="Password" id="password" error={fieldErrs.password}>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={(e) => set("password")(e.target.value)}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  className={`${inputCls(!!fieldErrs.password)} pr-8.5`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-[#9A9990] hover:text-[#141414] transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                </button>
+              </div>
+            </Field>
+            <Field label="Confirm" id="confirmPassword" error={fieldErrs.confirmPassword}>
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={form.confirmPassword}
+                  onChange={(e) => set("confirmPassword")(e.target.value)}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  className={`${inputCls(!!fieldErrs.confirmPassword)} pr-8.5`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-[#9A9990] hover:text-[#141414] transition-colors"
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                >
+                  {showConfirmPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                </button>
+              </div>
+            </Field>
+          </div>
+
+          {globalErr && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+              <span className="mt-1 size-1.5 rounded-full bg-red-400 shrink-0" />
+              <p className="text-[11.5px] text-red-600 leading-relaxed">{globalErr}</p>
+            </div>
+          )}
+
+          <button type="submit" disabled={isPending}
+            className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm cursor-pointer">
+            {isPending ? "Setting up account…" : "Create coordinator account"}
+          </button>
+        </form>
+
+        <div className="my-5 border-t border-[#D8D7CE]" />
+
+        <p className="text-[12px] text-center text-[#7A7973]">
+          Already have an account?{" "}
+          <Link href="/login" className="font-semibold text-[#141414] hover:underline underline-offset-4">
+            Sign in
+          </Link>
+        </p>
+
       </div>
-    </div>
+    </Layout>
   );
 }
 

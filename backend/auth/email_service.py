@@ -28,7 +28,7 @@ def send_email(*, recipient, subject, body):
         scopes=["https://www.googleapis.com/auth/gmail.send"],
     )
     try:
-        credentials.refresh(Request(timeout=10))
+        credentials.refresh(Request())
         message = EmailMessage()
         message["To"] = recipient
         message["From"] = settings.GMAIL_SENDER_EMAIL

@@ -68,8 +68,8 @@ def admin_only(user):
 
 
 def sign_out_all_devices(user):
-    for token in OutstandingToken.objects.filter(user=user):
-        BlacklistedToken.objects.get_or_create(token=token)
+    for token in OutstandingToken.objects.filter(user=user):  # type: ignore[attr-defined]
+        BlacklistedToken.objects.get_or_create(token=token)  # type: ignore[attr-defined]
 
 
 def user_response(user):
@@ -104,7 +104,7 @@ class IsAdmin(BasePermission):
         return bool(
             request.user
             and request.user.is_authenticated
-            and request.user.is_superuser
+            and getattr(request.user, "is_superuser", False)
         )
 
 class SignupView(APIView):
@@ -222,11 +222,12 @@ class LoginView(APIView):
         if admin_login and not user.is_superuser:
             return error("invalid_credentials", "Email or password is incorrect.", 401)
         if not admin_login and not user.is_superuser:
-            is_student = StudentProfile.objects.filter(user=user).exists()
+            student_profile = StudentProfile.objects.filter(user=user).first()
+            is_student = student_profile is not None
             is_coordinator = CoordinatorProfile.objects.filter(user=user).exists()
             if not is_student and not is_coordinator:
                 return error("account_type_invalid", "This account cannot sign in here.", 403)
-            if is_student and not user.studentprofile.email_verified:
+            if student_profile and not student_profile.email_verified:
                 return error("email_not_verified", "Verify your email before signing in.", 403)
         refresh = RefreshToken.for_user(user)
         if user.is_superuser:
@@ -272,7 +273,7 @@ class AdminLoginView(LoginView):
     #inherits LoginView's behaviour
     permission_classes = [AllowAny]
 
-    def post(self, request):
+    def post(self, request, admin_login=True):
         return super().post(request, admin_login=True) #accepts only a superuser account
 
 class RefreshView(APIView):

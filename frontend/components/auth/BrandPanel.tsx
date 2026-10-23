@@ -82,18 +82,18 @@ const COPY: Record<BrandPanelProps["variant"], {
     footer: "Obafemi Awolowo University · Faculty of Technology",
   },
   admin: {
-    eyebrow: "System Administration",
-    headline: <>Institutional<br />governance<br />console</>,
-    body: "Manage accounts, invite coordinators, configure programmes, and oversee all platform audit records.",
+    eyebrow: "Admin Console",
+    headline: <>Logr<br />administration<br />panel</>,
+    body: "Create coordinator accounts, assign departments, manage cohort dates, and view audit records for the OAU internship system.",
     bullets: [
-      "Invite & manage coordinator accounts",
-      "Configure cohorts & programmes",
-      "Platform-wide audit trail",
+      "Invite coordinators by department",
+      "Set cohort dates and programme windows",
+      "View all students, records, and audit trail",
     ],
     footer: (
       <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-white/25">
         <Lock className="size-3" />
-        All admin actions are cryptographically logged.
+        Every admin action is logged and timestamped.
       </span>
     ),
   },
