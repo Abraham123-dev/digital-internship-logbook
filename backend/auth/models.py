@@ -39,6 +39,12 @@ class LogrAccount(AbstractBaseUser):
         COORDINATOR = "COORDINATOR", "Coordinator"
         ADMINISTRATOR = "ADMINISTRATOR", "Administrator"
 
+    class Status(models.TextChoices):
+        ACTIVE = "ACTIVE", "Active"
+        DEACTIVATED = "DEACTIVATED", "Deactivated"
+        WITHDRAWN = "WITHDRAWN", "Withdrawn"
+        RUSTICATED = "RUSTICATED", "Rusticated"
+
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
@@ -46,6 +52,9 @@ class LogrAccount(AbstractBaseUser):
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
     role = models.CharField(max_length=20, default="STUDENT", choices=Role.choices)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    status_reason = models.CharField(max_length=100, blank=True)
+    status_note = models.TextField(blank=True)
 
     objects = AccountManager()
 
@@ -79,7 +88,24 @@ class StudentProfile(models.Model):
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
     programme = models.CharField(max_length=10, choices=Programme.choices)
     email_verified = models.BooleanField(default=False)
+<<<<<<< HEAD
     objects = models.Manager()
+=======
+    cohort = models.ForeignKey(
+        "management.Cohort",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="students",
+    )
+    coordinator = models.ForeignKey(
+        "accounts.CoordinatorProfile",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="students",
+    )
+>>>>>>> 3478d6d (Added cohort features, coordinators/supervisors reviews and admin management)
 
 
 class CoordinatorProfile(models.Model):

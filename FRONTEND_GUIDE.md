@@ -1,6 +1,6 @@
 # Frontend Integration Guide
 
-This guide describes the authentication API as it is currently routed in `backend/auth/urls.py`. Every endpoint is under `/api/v1/` and uses JSON request/response bodies unless stated otherwise. Use the full URL as `<API_BASE_URL>/api/v1/...` and include the trailing slash.
+This guide describes the authentication and management APIs as routed in `backend/auth/urls.py` and `backend/management/urls.py`. Every endpoint is under `/api/v1/` and uses JSON request/response bodies unless stated otherwise. Use the full URL as `<API_BASE_URL>/api/v1/...` and include the trailing slash.
 
 ## Requests, tokens, and errors
 
@@ -230,3 +230,121 @@ There is currently no `/me/` route in the URL list; use the role-specific profil
 - For coordinator acceptance, prefill the invitation email from validation as read-only and submit the link token; never ask the coordinator to type the token.
 - Handle serializer validation objects separately from flow errors because their response shapes differ.
 - Backend currently has no CSRF endpoint or refresh cookie flow; token exchange is JSON-based.
+
+## Cohorts, attendance, logbook review, and admin
+
+All routes below are under `/api/v1/`. Protected routes require `Authorization: Bearer <access-token>`. Management flow errors use `{ "code": "...", "message": "..." }`; serializer validation errors use DRF's field format, for example `{ "reason": ["This field is required."] }`.
+
+Student cohort assignment is automatic: verified students join the matching upcoming or active cohort for their department and programme. When a coordinator creates a cohort, matching students who do not already have a cohort are attached to it.
+
+### Cohorts
+
+| Method and route | Purpose and request | Success |
+| --- | --- | --- |
+| `POST /coordinator/cohorts/` | Create a cohort. Include `programme`, `session`, `start_date`, `end_date`; optionally set `working_days`, `holidays`, deadlines, and attendance settings. | `201`: cohort fields, calculated `status`, and `total_weeks` |
+| `PATCH /coordinator/cohorts/{id}/` | Update a cohort owned by the signed-in coordinator. | Updated cohort |
+| `GET /cohorts/current/` | Read the signed-in student's cohort and current position. | `{ "server_time", "cohort", "week_number", "day_number" }`; `cohort` may be `null` |
+| `GET /admin/cohorts/` | Admin list of cohorts. | `{ "results": [...] }` |
+| `PATCH /admin/cohorts/{id}/` | Admin edit of a cohort. | Updated cohort |
+
+Date errors include `cohort_started` when saved logbook activity prevents moving cohort dates and `holiday_has_entry` when a holiday overlaps a saved entry. A coordinator can create cohorts only for their assigned programme and department.
+
+### SWEP attendance
+
+SWEP attendance applies only to students in the SWEP programme.
+
+| Method and route | Purpose and request | Success |
+| --- | --- | --- |
+| `POST /coordinator/attendance/sessions/` | Open a code; `{ "minutes": 3 }` (optional, 1–3). | `201`: `{ "id", "code", "expires_at", "server_time" }` |
+| `GET /coordinator/attendance/sessions/current/` | Get the current code and present count. | `{ "session": null }` or session details with `code`, `seconds_left`, and `present_count` |
+| `POST /coordinator/attendance/sessions/{id}/end/` | End a session; empty body. | `{ "message": "Attendance session ended." }` |
+| `POST /student/attendance/` | Check in; `{ "code": "ABC234" }`. | `{ "date", "status": "PRESENT" }` |
+| `GET /student/attendance/history/` | Read attendance history. | `{ "presentCount", "totalCodedDays", "records": [...] }` |
+| `POST /coordinator/students/{id}/attendance/` | Override; `{ "date": "YYYY-MM-DD", "status": "PRESENT" or "EXCUSED", "reason": "..." }`. | `{ "date", "status" }` |
+
+The code is six characters and expires within three minutes. A student can check in once per day; repeating a successful check-in returns the existing record. A day with an attendance session but no student record appears as `ABSENT` in history. Common errors: `not_applicable`, `attendance_closed`, `code_invalid_or_expired`, `too_many_attempts`, `not_working_day`, and `attendance_limit`.
+
+### Student logbook entries and photos
+
+| Method and route | Purpose and request | Success |
+| --- | --- | --- |
+| `GET /student/logbook/` | Read current week and progress. | Current week, previous weeks, deadline, and progress fields |
+| `GET /student/logbook/weeks/{week_no}/` | Read a specific week. | Week status, working days, entries, and deadline |
+| `POST /student/logbook/weeks/{week_no}/` | Submit a week after each working day has enough activity text. | Updated week payload |
+| `GET /student/logbook/days/{YYYY-MM-DD}/` | Read one working day. | Entry fields, comments/ratings if present, photo URLs, and `editable` |
+| `PUT /student/logbook/days/{YYYY-MM-DD}/` | Save `{ "activities": "...", "skills": "...", "review_text": "..." }`. | `{ "updatedAt", "ready", "canSubmit" }` |
+
+Photos are optional. Save the day first, then send a multipart request with the file field named `photo` to `POST /student/logbook/days/{YYYY-MM-DD}/photos/`. PNG, JPEG, and WebP files up to 5 MB are accepted; each day can have at most five. Success (`201`) returns the photo id and a five-minute signed Cloudinary URL. Remove it with `DELETE /student/logbook/photos/{photo_id}/`. `CLOUDINARY_URL` must be configured on the backend.
+
+Photo errors include `entry_required`, `photo_required`, `photo_type_invalid`, `photo_too_large`, `photo_limit`, and `photo_upload_failed`.
+
+### Coordinator dashboard, extensions, and grading
+
+`GET /coordinator/dashboard/` returns student, review-queue, and today's attendance counts. `GET /coordinator/students/` lists assigned students (optional `?q=` search), including `supervisorName` for SIWES students when saved. `GET /coordinator/students/{id}/` returns one student's week progress and, for SIWES, a `supervisor` object with `name`, `email`, `phone`, and `organisation`; it is `null` until the student first sends a supervisor review. `GET /coordinator/weeks/{id}/` reads a submitted week and its entries.
+
+Grade an entry with `PUT /coordinator/entries/{id}/review/` and `{ "rating": 1, "comment": "..." }`; the rating must be 1–5. Finish a week with `POST /coordinator/weeks/{id}/finish/` after every written entry has a rating. Return it for correction with `POST /coordinator/weeks/{id}/return/` and `{ "comment": "..." }`. Coordinators provide the only numeric grades; supervisors do not score logbooks.
+
+After a deadline passes, a student can request more time with `POST /student/logbook/weeks/{week_no}/extension-request/` and `{ "reason": "..." }`, within the cohort's request window. Coordinators review pending requests with `GET /coordinator/extension-requests/`; decide with `POST /coordinator/extension-requests/{id}/decision/` and `{ "decision": "APPROVED", "days": 3 }`, or `{ "decision": "REJECTED", "comment": "..." }`. Approved days cannot exceed the cohort's `max_grace_days`; the revised deadline appears in the week response.
+
+Common errors include `week_locked`, `days_not_filled`, `deadline_passed`, `extension_window_closed`, `entries_not_rated`, and `week_in_supervisor_review`.
+
+### SIWES supervisor review
+
+The student uses `GET /student/supervisor-reviews/` to list batches and eligible unsent weeks. `POST` on that route sends eligible submitted/reviewed weeks and supervisor details: `{ "name": "...", "email": "...", "phone": "+...", "organisation": "..." }`. The student can resend a link with `POST /student/supervisor-reviews/{id}/resend/` (empty body; limited to one resend per 24 hours).
+
+The emailed review link contains a token. The frontend reads it from the link, then sends it in `X-Supervisor-Token` for both `GET /supervisor/review/` and `POST /supervisor/review/`. Supervisors have no account, do not receive a score field, and the token expires after 14 days and is single-use. `POST /supervisor/review/request-link/` asks the student to resend the link; it does not create a token.
+
+For a typed signature, submit `{ "review_text": "...", "signature_type": "TYPED", "signed_name": "Full Name", "confirm_signature": true }`. For a drawn signature, submit `signature_type: "DRAWN"` and `signature_data` containing a PNG data URL; it must be smaller than 100 KB. The backend uploads the image to Cloudinary as an authenticated asset. The student's batch response includes a five-minute signed URL for a drawn signature. If Cloudinary is unavailable, submission returns `signature_upload_failed` (`503`) and the token remains usable.
+
+The signature pad should be a browser canvas. The supervisor can draw with a mouse or trackpad on a laptop, or a finger or stylus on a phone/tablet.
+
+**The frontend should make the pad large enough for touch, prevent the page from scrolling while someone signs on it, and provide Clear and Submit buttons.**
+
+Token errors include `token_invalid`, `token_expired`, `already_submitted`, and `throttled`. Students receive `nothing_to_send` when there are no eligible weeks.
+
+### In-app notifications
+
+Notifications belong to the signed-in account. Use the access token for these endpoints; each user only receives their own notifications. `GET /notifications/` returns notifications newest first and an unread count:
+
+```json
+{
+  "results": [
+    {
+      "id": "12",
+      "trigger": "extension_approved",
+      "message": "Your extension request for week 2 was approved.",
+      "isRead": false,
+      "createdAt": "2026-10-23T14:00:00+01:00",
+      "linkTo": "/student/week/2"
+    }
+  ],
+  "unreadCount": 1
+}
+```
+
+Call `POST /notifications/{id}/read/` when the user marks one notification as read; the response is that notification with `isRead: true`. Call `POST /notifications/read-all/` to mark all of the signed-in account's unread notifications as read; success returns `{ "updated": 3 }`. Trying to mark another account's notification as read returns `not_found` (`404`).
+
+Trigger values are `week_unsubmitted_friday`, `week_unsubmitted_saturday`, `week_locked`, `week_submitted_coordinator`, `extension_requested`, `extension_approved`, `extension_denied`, `week_returned`, `week_reviewed`, `supervisor_details_received`, and `supervisor_review_submitted`.
+
+In-app notifications are created when a week is submitted, an extension is requested or decided, a coordinator returns or finishes reviewing a week, supervisor details are sent, or a supervisor review is submitted. The scheduled reminder command also creates unsubmitted-week notifications on Friday at 3:00 p.m. and Saturday at 6:00 p.m. Africa/Lagos time, and a week-locked notification after its effective deadline. The command must run every five minutes for those checks. Email delivery remains a separate channel.
+
+### Admin
+
+Every admin route requires a superuser access token.
+
+| Method and route | Purpose and request | Success |
+| --- | --- | --- |
+| `GET /admin/overview/` | Read counts for students, coordinators, accounts, cohorts, and pending reviews. | Count fields |
+| `GET /admin/users/` | List accounts; optional `q`, `role`, and `status` query filters. | `{ "results": [...] }` |
+| `PATCH /admin/users/{id}/status/` | Deactivate/withdraw/rusticate: `{ "status", "reason", "note" }`. | Account status; refresh tokens are blacklisted |
+| `POST /admin/users/{id}/status/` | Reactivate an account; empty body. | `{ "id", "status": "ACTIVE", "is_active": true }` |
+| `DELETE /admin/users/{id}/` | Hard-delete after confirmation: `{ "confirm_email": "account email" }`. | `204`; audit event is recorded first |
+| `POST /admin/students/{id}/reassign/` | Assign a coordinator: `{ "coordinator_id": 1 }`. | `{ "student_id", "coordinator_id" }` |
+| `POST /admin/coordinators/{id}/reassign/` | Move students/cohorts: `{ "new_coordinator_id": 2 }`; old account is deactivated. | Moved student count and account status |
+| `PATCH /admin/students/{id}/assignment/` | Correct cohort/coordinator assignment with `cohort_id` and/or `coordinator_id`. | Updated student assignment |
+| `PATCH /admin/students/{id}/programme/` | Change programme: `{ "programme": "SWEP" or "SIWES" }`; only before logbook entries exist. | Updated programme and cohort id |
+| `GET /admin/reports/` | Counts; optional `?cohort_id={id}` or `?format=csv`. | JSON summary or CSV download |
+| `POST /admin/supervisor-reviews/{id}/void/` | Void an unsubmitted batch and revoke its link. | Batch id and `void` status |
+| `GET /admin/audit-logs/` | Latest 200 events; optional `actor`, `action`, `date_from`, `date_to` filters. | `{ "results": [...] }` |
+
+Admin errors include `not_found`, `assignment_mismatch`, `programme_locked`, `already_reviewed`, `cohort_not_found`, `delete_confirmation_required`, and `account_in_use`. Status changes preserve user records; hard deletion is available only through the separately confirmed endpoint above.
