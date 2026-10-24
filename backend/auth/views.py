@@ -429,6 +429,7 @@ class ResetPasswordView(APIView):
 
 class InvitationListCreateView(APIView):
     permission_classes = [IsAdmin]
+    authentication_classes = [JWTAuthentication]
 
     def get(self, request):
         if not admin_only(request.user):
@@ -474,6 +475,7 @@ def send_invitation_email(invitation):
 
 class InvitationManageView(APIView):
     permission_classes = [IsAdmin]
+    authentication_classes = [JWTAuthentication]
 
     def post(self, request, invitation_id):
         if not admin_only(request.user):
