@@ -2,6 +2,8 @@
 
 This checklist sets up the Django API and the 24-hour logbook deadline reminder on Render. The reminder uses a Django management command and Render Cron Job. It does not use Celery or Redis.
 
+Complete the applicable checklist items before the project defense.
+
 ## 1. Prepare the project
 
 - Push the latest project code to the Git branch Render will deploy. This includes `send_deadline_reminders` and migration `0006_inappnotification`.
@@ -41,13 +43,41 @@ python -c "import secrets; print(secrets.token_urlsafe(64))"
 
 `GMAIL_FROM_EMAIL` is accepted as an alternative to `GMAIL_SENDER_EMAIL`, but use `GMAIL_SENDER_EMAIL` for a new setup.
 
-If `CACHE_BACKEND=database`, create the cache table once after migrations:
+### Configure the Django cache
+
+Set `CACHE_BACKEND=database` in the local `.env` and in the Render Web Service environment. This lets pending signup details survive a Django restart and be shared across service processes. `CACHE_TABLE` is optional; leave it unset to use `django_cache`.
+
+After applying migrations, create the cache table once for each database (local and Render):
 
 ```bash
 python manage.py createcachetable
 ```
 
-## 3. Apply database migrations
+Run this from the project root with the matching environment/database active. If the table already exists, do not create it again. Restart Django locally after changing `.env`; Render will redeploy or restart after an environment change.
+
+## 3. Authorize and verify the Gmail sender
+
+The browser authorization is completed once by the person who controls the shared sender mailbox. It is not part of a student's signup. The project uses the `gmail.send` OAuth scope.
+
+For local testing, keep the OAuth consent screen in **Testing**, add the sender mailbox under **Test users**, and authorize it with the project's Desktop OAuth client:
+
+```powershell
+.\venv\Scripts\python.exe scripts\authorize_gmail_sender.py
+```
+
+Sign in as the sender, approve the Gmail permission, then put the printed refresh token in Render as `GMAIL_REFRESH_TOKEN`. Keep the client ID and client secret from the same OAuth client. While an External app is in Testing, Google limits authorization to listed test users and refresh tokens for this Gmail scope expire after seven days. This is suitable for temporary testing only; the service will need a newly authorized token after it expires. See [Google's OAuth refresh-token guidance](https://developers.google.com/identity/protocols/oauth2).
+
+Before preparing a production verification request, **check whether Logr's Gmail use is eligible**. Logr currently uses Gmail to send transactional OTP, invitation, password-reset, and reminder messages. Google's Gmail API policy lists approved use cases such as email clients, email backup, and productivity features; it does not clearly describe a transactional-only sender as an approved use case. Google may reject verification for this use, so do not claim a different use case in the submission. Review [Google's Gmail scope policy](https://developers.google.com/workspace/workspace-api-user-data-developer-policy) before investing in verification work.
+
+If Google confirms the use case is eligible, prepare the production OAuth project and submit it for verification:
+
+1. Use the production Google Cloud project and enable the Gmail API. Google recommends keeping testing and production projects separate.
+2. Set up the app's branding and contact details. Provide a public homepage and privacy policy on a domain you own. The homepage must describe Logr and link to the privacy policy; verify the domain in Google Search Console and list it as an authorized domain. A Render-provided `onrender.com` hostname may not satisfy Google's domain-ownership requirement.
+3. In Google Auth Platform **Data Access**, declare only `https://www.googleapis.com/auth/gmail.send` and explain why Logr needs to send messages through the shared mailbox.
+4. Publish the OAuth app to **In production**, then choose **Prepare for verification** / **Verification Center** and submit the request. Google's review requires a demonstration video showing the OAuth consent screen, the requested scope, and the app functionality that uses Gmail. Follow Google's [verification requirements](https://support.google.com/cloud/answer/13464321) and [submission steps](https://support.google.com/cloud/answer/13461325).
+5. After approval, authorize the production Desktop OAuth client locally with `scripts/authorize_gmail_sender.py` and replace `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and `GMAIL_REFRESH_TOKEN` in the Render Web Service environment with values from that production project. Then restart/redeploy the service and test OTP delivery.
+
+## 4. Apply database migrations
 
 Before the cron job runs, apply the project's migrations to the production database. In Render, open the web service Shell and run:
 
@@ -63,7 +93,7 @@ If this is a brand-new database, create the first superuser from the web service
 python manage.py createsuperuser
 ```
 
-## 4. Create the Render Cron Job
+## 5. Create the Render Cron Job
 
 In the Render dashboard:
 
@@ -84,7 +114,7 @@ In the Render dashboard:
 
 The schedule expression is UTC. `*/5 * * * *` means run every five minutes. The command checks for open logbook weeks whose effective deadline is within a ten-minute window around 24 hours from its run time. It also creates Friday 3:00 p.m. and Saturday 6:00 p.m. Africa/Lagos in-app reminders and notices when an open week's effective deadline has passed. Running every five minutes catches these checks and the email reminder window; repeated runs do not duplicate in-app notices. Render runs the command and stops the job when the command exits; no always-running worker is needed. See [Render Cron Jobs documentation](https://render.com/docs/cronjobs).
 
-## 5. Check the setup
+## 6. Check the setup
 
 Run these checks from the project root before relying on reminders:
 
@@ -96,7 +126,7 @@ python manage.py send_deadline_reminders
 
 The last command is a real send operation: it emails any students with an eligible deadline at that moment. Run it manually only when that is intended. In Render, check the Cron Job's **Runs** and logs after its first scheduled run. A successful run reports the number sent and any Gmail delivery failures. The `reminder_sent_for` value is saved after successful delivery, so repeated runs do not resend for the same deadline. A later approved extension has a different deadline and can receive its own reminder.
 
-## 6. Local Windows testing (optional)
+## 7. Local Windows testing (optional)
 
 You can run the same command manually from PowerShell:
 
