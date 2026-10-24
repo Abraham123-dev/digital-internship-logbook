@@ -150,7 +150,7 @@ class SignupView(APIView):
         try:
             send_otp_email(email, otp)
         except EmailDeliveryError:
-            logger.warning("Gmail could not send a student verification code")
+            logger.exception("Gmail could not send a student verification code")
             return error("email_delivery_failed", "Account created. Request another code shortly.", 503)
         cache.set(otp_cache_key(email), otp, timeout=OTP_LIFETIME_SECONDS)
         return Response({"message": "Verification code sent.", "email": email}, status=201)
@@ -218,7 +218,8 @@ class ResendOTPView(APIView):
             try:
                 send_otp_email(email, otp)
             except EmailDeliveryError:
-                logger.warning("Gmail could not resend a student verification code")
+                #prints the exact error traceback to the console
+                logger.exception("Gmail could not resend a student verification code")
                 return error("email_delivery_failed", "We could not send the code. Try again shortly.", 503)
             cache.set(otp_cache_key(email), otp, timeout=OTP_LIFETIME_SECONDS)
         return Response({"server_time": current_time(), "message": "If verification is needed, a code has been sent."})
