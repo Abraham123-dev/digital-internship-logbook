@@ -88,9 +88,8 @@ class StudentProfile(models.Model):
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
     programme = models.CharField(max_length=10, choices=Programme.choices)
     email_verified = models.BooleanField(default=False)
-<<<<<<< HEAD
+    
     objects = models.Manager()
-=======
     cohort = models.ForeignKey(
         "management.Cohort",
         null=True,
@@ -105,7 +104,6 @@ class StudentProfile(models.Model):
         on_delete=models.SET_NULL,
         related_name="students",
     )
->>>>>>> 3478d6d (Added cohort features, coordinators/supervisors reviews and admin management)
 
 
 class CoordinatorProfile(models.Model):
