@@ -1121,20 +1121,92 @@ class CoordinatorDashboardView(APIView):
         coordinator = get_coordinator(request.user)
         students = StudentProfile.objects.filter(coordinator=coordinator)
         today = timezone.localdate()
+        now = timezone.now()
         sessions = AttendanceSession.objects.filter(
             created_by=coordinator,
             date=today,
         )
+        submitted_weeks = WeeklySubmission.objects.filter(
+            student__coordinator=coordinator,
+            status=WeeklySubmission.Status.SUBMITTED,
+        )
+        weeks_to_review = WeeklySubmission.objects.filter(
+            student__coordinator=coordinator,
+            status__in=[WeeklySubmission.Status.SUBMITTED, WeeklySubmission.Status.RETURNED],
+        )
+        pending_extensions = ExtensionRequest.objects.filter(
+            week__student__coordinator=coordinator,
+            status=ExtensionRequest.Status.PENDING,
+        ).count()
+        attendance_records = AttendanceRecord.objects.filter(student__coordinator=coordinator)
+        attendance_count = attendance_records.count()
+        present_count = attendance_records.filter(
+            status=AttendanceRecord.Status.PRESENT,
+        ).count()
+
+        cohorts = Cohort.objects.filter(coordinator=coordinator).order_by("-start_date")
+        cohort = (
+            cohorts.filter(start_date__lte=today, end_date__gte=today).first()
+            or cohorts.filter(start_date__gt=today).order_by("start_date").first()
+            or cohorts.first()
+        )
+        if cohort and cohort.start_date <= today:
+            days_from_start = (today - cohort.start_date).days
+            week_number = min(
+                cohort.total_weeks,
+                max(1, (days_from_start + cohort.start_date.weekday()) // 7 + 1),
+            )
+            submission_deadline = week_deadline(cohort, week_number).strftime("%d %b %Y, %I:%M %p")
+        else:
+            week_number = 0
+            submission_deadline = "Not set"
+
+        recent_submissions = []
+        for week in submitted_weeks.select_related("student__user", "cohort").order_by("-submitted_at")[:5]:
+            week_start = cohort_week_start(week.cohort, week.week_no)
+            week_end = min(week_start + timedelta(days=6), week.cohort.end_date)
+            activities = [
+                entry.activities.strip()
+                for entry in week.entries.order_by("entry_date")
+                if entry.activities.strip()
+            ]
+            recent_submissions.append({
+                "id": str(week.pk),
+                "studentName": account_name(week.student.user),
+                "matricNo": week.student.matric_no,
+                "weekNumber": week.week_no,
+                "dates": f"{week_start:%d %b %Y} – {week_end:%d %b %Y}",
+                "tasksSummary": " ".join(activities)[:300] or "Submitted logbook entries.",
+                "status": "PENDING_REVIEW",
+                "submittedAt": week.submitted_at.strftime("%d %b, %I:%M %p") if week.submitted_at else "",
+            })
+
         return Response({
+            "stats": {
+                "enrolledStudents": students.count(),
+                "pendingReviews": submitted_weeks.count(),
+                "pendingExtensions": pending_extensions,
+                "overdueWeeks": WeeklySubmission.objects.filter(
+                    student__coordinator=coordinator,
+                    status=WeeklySubmission.Status.OPEN,
+                ).filter(
+                    Q(extended_until__lt=now)
+                    | Q(extended_until__isnull=True, deadline_at__lt=now)
+                ).count(),
+                "averageAttendance": round(present_count / attendance_count * 100) if attendance_count else 0,
+            },
+            "recentSubmissions": recent_submissions,
+            "cohortInfo": {
+                "programme": cohort.programme if cohort else coordinator.programme,
+                "cycle": cohort.session if cohort else "No cohort created",
+                "weekNumber": week_number,
+                "totalWeeks": cohort.total_weeks if cohort else 0,
+                "submissionDeadline": submission_deadline,
+            },
+            # Keep the existing count fields for API callers that use them.
             "student_count": students.count(),
-            "submitted_weeks": WeeklySubmission.objects.filter(
-                student__in=students,
-                status=WeeklySubmission.Status.SUBMITTED,
-            ).count(),
-            "weeks_to_review": WeeklySubmission.objects.filter(
-                student__in=students,
-                status__in=[WeeklySubmission.Status.SUBMITTED, WeeklySubmission.Status.RETURNED],
-            ).count(),
+            "submitted_weeks": submitted_weeks.count(),
+            "weeks_to_review": weeks_to_review.count(),
             "attendance_today": {
                 "sessions": sessions.count(),
                 "present": AttendanceRecord.objects.filter(
