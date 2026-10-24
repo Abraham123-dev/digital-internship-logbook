@@ -26,20 +26,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 load_dotenv()
-FRONTEND_URL = (
-    os.getenv("FRONTEND_URL") or "http://localhost:3000"
-).rstrip("/")
-frontend_url_parts = urlsplit(FRONTEND_URL)
-FRONTEND_ORIGIN = f"{frontend_url_parts.scheme}://{frontend_url_parts.netloc}"
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "True").lower() in {"1", "true", "yes"}
 
 ALLOWED_HOSTS = [
-    host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost, 127.0.0.1").split(",")
     if host.strip()
 ]
+
+#get the frontend URL
+FRONTEND_URL = (
+    os.getenv("FRONTEND_URL") or "http://localhost:3000"
+).rstrip("/")
+
+frontend_url_parts = urlsplit(FRONTEND_URL)
+
+FRONTEND_ORIGIN = f"{frontend_url_parts.scheme}://{frontend_url_parts.netloc}"
 
 
 # Application definition
