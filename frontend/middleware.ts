@@ -36,13 +36,6 @@ function decodeJwtRole(token?: string): Role | null {
 }
 
 export function middleware(req: NextRequest) {
-  // ── DEV PREVIEW MODE ─────────────────────────────────────────────────────────
-  // Auth guards are bypassed so all pages can be visited at their direct URLs.
-  // To restore production auth: delete the next line only.
-  return NextResponse.next();
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  // eslint-disable-next-line no-unreachable
   const { pathname } = req.nextUrl;
 
   if (pathname.startsWith("/supervisor")) return NextResponse.next();

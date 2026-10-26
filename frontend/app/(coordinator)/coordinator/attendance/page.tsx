@@ -225,7 +225,7 @@ export default function CoordinatorAttendancePage() {
                       )}
 
                       <button
-                        onClick={() => setOverrideModal({ studentId: r.studentId, studentName: r.studentName })}
+                        onClick={() => setOverrideModal({ studentId: String(r.studentId), studentName: r.studentName })}
                         className="text-[10.5px] font-semibold text-[#7A7973] hover:text-[#141414] underline underline-offset-2 ml-1 cursor-pointer"
                       >
                         Override

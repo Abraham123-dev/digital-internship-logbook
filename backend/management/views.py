@@ -297,6 +297,11 @@ class CoordinatorCohortView(APIView):
     permission_classes = [IsAuthenticated, IsCoordinator]
     authentication_classes = [JWTAuthentication]
 
+    def get(self, request):
+        coordinator = get_coordinator(request.user)
+        cohorts = Cohort.objects.filter(coordinator=coordinator).order_by("-start_date")
+        return Response({"results": CohortSerializer(cohorts, many=True).data})
+
     def post(self, request):
         coordinator = get_coordinator(request.user)
         serializer = CohortSerializer(data=request.data)
@@ -853,11 +858,20 @@ class CoordinatorExtensionRequestListView(APIView):
             {
                 "id": item.pk,
                 "student_id": item.week.student_id,
+                "studentId": item.week.student_id,
                 "student_name": f"{item.week.student.user.first_name} {item.week.student.user.last_name}".strip(),
+                "studentName": f"{item.week.student.user.first_name} {item.week.student.user.last_name}".strip(),
+                "matric_no": item.week.student.matric_no,
+                "matricNo": item.week.student.matric_no,
                 "week_id": item.week_id,
+                "weekId": item.week_id,
                 "week_number": item.week.week_no,
+                "weekNumber": item.week.week_no,
                 "reason": item.reason,
+                "status": item.status,
                 "requested_at": item.requested_at.isoformat(),
+                "requestedAt": item.requested_at.isoformat(),
+                "deadlineDate": item.week.deadline_date.isoformat() if getattr(item.week, "deadline_date", None) else None,
             }
             for item in requests[:100]
         ]})
@@ -1271,32 +1285,37 @@ class CoordinatorWeekView(APIView):
             return api_error("week_not_submitted", "This week is not ready for coordinator review.")
 
         entries = week.entries.select_related("coordinator_review").order_by("entry_date")
+        entries_data = [
+            {
+                "id": entry.pk,
+                "date": entry.entry_date.isoformat(),
+                "dayName": entry.entry_date.strftime("%A"),
+                "activities": entry.activities,
+                "skills": entry.skills,
+                "studentReview": entry.review_text,
+                "rating": entry.coordinator_review.rating if hasattr(entry, "coordinator_review") else None,
+                "comment": entry.coordinator_review.comment if hasattr(entry, "coordinator_review") else "",
+                "photos": [
+                    private_photo_url(photo.cloudinary_key, photo.file_format)
+                    for photo in entry.photos.all()
+                ],
+            }
+            for entry in entries
+        ]
         return Response({
             "id": week.pk,
             "weekNumber": week.week_no,
             "status": week_state(week).lower(),
             "isLate": week.is_late,
+            "studentName": f"{week.student.user.first_name} {week.student.user.last_name}".strip(),
+            "matricNo": week.student.matric_no,
             "student": {
                 "id": week.student_id,
                 "name": f"{week.student.user.first_name} {week.student.user.last_name}".strip(),
                 "matricNo": week.student.matric_no,
             },
-            "entries": [
-                {
-                    "id": entry.pk,
-                    "date": entry.entry_date.isoformat(),
-                    "activities": entry.activities,
-                    "skills": entry.skills,
-                    "studentReview": entry.review_text,
-                    "rating": entry.coordinator_review.rating if hasattr(entry, "coordinator_review") else None,
-                    "comment": entry.coordinator_review.comment if hasattr(entry, "coordinator_review") else "",
-                    "photos": [
-                        private_photo_url(photo.cloudinary_key, photo.file_format)
-                        for photo in entry.photos.all()
-                    ],
-                }
-                for entry in entries
-            ],
+            "entries": entries_data,
+            "days": entries_data,
         })
 
 

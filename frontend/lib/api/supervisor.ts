@@ -1,155 +1,115 @@
 import type { ApiResult } from "@/types/api";
+import { api } from "./client";
 
-const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api/v1";
-
-export interface SupervisorReviewBatchData {
-  token: string;
-  studentName: string;
-  matricNo: string;
-  department: string;
-  programme: "SIWES";
-  companyName: string;
-  sentAt: string;
-  expiresAt: string;
-  isExpired: boolean;
-  isCompleted: boolean;
-  completedAt?: string;
-  weeks: Array<{
-    weekNumber: number;
-    dates: string;
-    days: Array<{
-      dayName: string;
-      date: string;
-      activities: string;
-      skills: string;
-      reflection: string;
-      photos: string[];
-    }>;
-  }>;
+export interface SupervisorDayEntry {
+  date: string;
+  dayName?: string;
+  activities: string;
+  skills?: string;
+  studentReview?: string;
+  reflection?: string;
+  photos?: string[];
 }
+
+export interface SupervisorWeek {
+  weekNumber: number;
+  dates?: string;
+  entries?: SupervisorDayEntry[];
+  days?: SupervisorDayEntry[];
+}
+
+export interface SupervisorBatchData {
+  student?: {
+    name: string;
+    matricNo: string;
+    programme: string;
+    organisation?: string | null;
+    department?: string;
+  };
+  studentName?: string;
+  matricNo?: string;
+  programme?: string;
+  department?: string;
+  companyName?: string;
+  isCompleted?: boolean;
+  completedAt?: string;
+  weeks: SupervisorWeek[];
+}
+
+export type SupervisorReviewBatchData = SupervisorBatchData;
 
 export interface SupervisorSubmitPayload {
-  token: string;
-  supervisorName: string;
-  supervisorRole: string;
-  reviewText: string;
-  rating: number; // 1 to 5
-  signatureType: "typed" | "drawn";
-  signatureValue: string;
-  confirmationAgreed: boolean;
+  review_text?: string;
+  reviewText?: string;
+  signature_type?: "TYPED" | "DRAWN" | "typed" | "drawn";
+  signatureType?: "TYPED" | "DRAWN" | "typed" | "drawn";
+  signed_name?: string;
+  signatureValue?: string;
+  supervisorName?: string;
+  supervisorRole?: string;
+  rating?: number;
+  signature_data?: string;
+  token?: string;
+  confirmationAgreed?: boolean;
 }
 
+/* ── Supervisor API Client ────────────────────────────────────────── */
 export const supervisorApi = {
-  /** Validate token and fetch logbook batch */
-  async getReviewBatch(token?: string): Promise<ApiResult<SupervisorReviewBatchData>> {
-    if (!token || token === "invalid") {
-      return {
-        ok: false,
-        status: 404,
-        message: "invalid_token",
-      };
-    }
-
-    if (token === "expired") {
-      return {
-        ok: false,
-        status: 410,
-        message: "link_expired",
-      };
-    }
-
-    // Try live endpoint if backend implements it
-    try {
-      const res = await fetch(`${BASE}/supervisor/review/?token=${encodeURIComponent(token)}`);
-      if (res.ok) {
-        const data = await res.json();
-        return { ok: true, data };
-      }
-    } catch {
-      // Fallback to development typed mock
-    }
-
-    // Default mock batch
-    return {
-      ok: true,
-      data: {
-        token,
-        studentName: "Ada Okafor",
-        matricNo: "CSC/2021/042",
-        department: "Computer Science & Engineering",
-        programme: "SIWES",
-        companyName: "SoftCom Technologies, Lagos",
-        sentAt: "19 October 2024",
-        expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
-        isExpired: false,
-        isCompleted: false,
-        weeks: [
-          {
-            weekNumber: 3,
-            dates: "14 – 18 October 2024",
-            days: [
-              {
-                dayName: "Monday",
-                date: "2024-10-14",
-                activities: "Analyzed relational database schema for internal logistics API. Built PostgreSQL migrations with index constraints.",
-                skills: "PostgreSQL, DDL scripts, ER models, indexing.",
-                reflection: "Took time to properly model foreign key constraints for cascading archive safety.",
-                photos: [],
-              },
-              {
-                dayName: "Tuesday",
-                date: "2024-10-15",
-                activities: "Set up Docker Compose orchestrator for containerized local API, cache worker, and database instances.",
-                skills: "Docker Compose, multi-service bridge networks, port mapping.",
-                reflection: "Solved port collision on default 5432 by binding isolated development network.",
-                photos: [],
-              },
-              {
-                dayName: "Wednesday",
-                date: "2024-10-16",
-                activities: "Automated database fixture seed generation with Python and Django ORM bulk_create.",
-                skills: "Python scripting, ORM batch inserts.",
-                reflection: "Reduced local migration bootstrapping duration from 40s to 2s.",
-                photos: [],
-              },
-              {
-                dayName: "Thursday",
-                date: "2024-10-17",
-                activities: "Wrote unit tests for session token rotation and refresh token blacklist validation.",
-                skills: "Pytest, REST mocks, JWT token assertion.",
-                reflection: "Identified boundary condition when password change revokes refresh tokens.",
-                photos: [],
-              },
-              {
-                dayName: "Friday",
-                date: "2024-10-18",
-                activities: "Demonstrated working proof of concept to engineering lead during sprint review.",
-                skills: "Sprint demo, technical presentation, engineering sprint planning.",
-                reflection: "Received positive remarks from senior engineers on test suite coverage.",
-                photos: [],
-              },
-            ],
-          },
-        ],
-      },
+  /**
+   * Validate token and fetch logbook batch.
+   * Token is passed as X-Supervisor-Token header (not in URL query).
+   */
+  async getReviewBatch(token: string): Promise<ApiResult<SupervisorBatchData>> {
+    const res = await api.get<any>("/supervisor/review/", {
+      public: true,
+      headers: { "X-Supervisor-Token": token },
+    });
+    if (!res.ok) return res;
+    const d = res.data;
+    const student = d.student || {};
+    const norm: SupervisorBatchData = {
+      ...d,
+      student,
+      studentName: d.studentName || student.name || "",
+      matricNo: d.matricNo || student.matricNo || "",
+      programme: d.programme || student.programme || "SIWES",
+      department: d.department || student.department || "Engineering",
+      companyName: d.companyName || student.organisation || "Host Organisation",
+      isCompleted: Boolean(d.isCompleted || d.is_completed),
+      completedAt: d.completedAt || d.completed_at,
+      weeks: d.weeks || [],
     };
+    return { ok: true, data: norm };
   },
 
-  /** Submit supervisor evaluation and signature */
-  async submitReview(payload: SupervisorSubmitPayload): Promise<ApiResult<{ success: boolean }>> {
-    try {
-      const res = await fetch(`${BASE}/supervisor/submit/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        return { ok: true, data: { success: true } };
-      }
-    } catch {
-      // Backend not yet available
+  /**
+   * Submit supervisor evaluation and signature.
+   * Accepts either (token, payload) or a single payload object containing token.
+   */
+  submitReview(
+    arg1: string | SupervisorSubmitPayload,
+    arg2?: SupervisorSubmitPayload
+  ): Promise<ApiResult<{ message: string }>> {
+    const token = typeof arg1 === "string" ? arg1 : (arg1.token ?? "");
+    const payload = typeof arg1 === "string" ? (arg2 ?? {}) : arg1;
+
+    const review_text = payload.review_text ?? payload.reviewText ?? "";
+    const rawSigType = payload.signature_type ?? payload.signatureType ?? "TYPED";
+    const signature_type = rawSigType.toUpperCase() as "TYPED" | "DRAWN";
+    const signed_name = payload.signed_name ?? payload.signatureValue ?? payload.supervisorName ?? "";
+
+    const body: Record<string, unknown> = {
+      review_text,
+      signature_type,
+      signed_name,
+    };
+    if (payload.signature_data) {
+      body.signature_data = payload.signature_data;
     }
 
-    return { ok: true, data: { success: true } };
+    return api.post("/supervisor/review/", body, {
+      public: true,
+      headers: { "X-Supervisor-Token": token },
+    });
   },
 };

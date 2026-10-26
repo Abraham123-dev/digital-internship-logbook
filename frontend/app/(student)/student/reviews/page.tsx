@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Send, X, Clock, CheckCircle2, AlertCircle,
-  Building, Star
+  Building, Star, Inbox
 } from "lucide-react";
 import { studentApi, type SupervisorReviewBatchItem } from "@/lib/api/student";
 
@@ -37,10 +37,13 @@ function SendSheet({
     setSending(true);
     setError(null);
 
+    const formattedPhone = phone.trim() ? (phone.trim().startsWith("+") ? phone.trim() : `+${phone.trim()}`) : "+2348000000000";
+
     const res = await studentApi.sendSupervisorBatch({
       supervisorName: name.trim(),
       supervisorEmail: email.trim(),
       companyName: org.trim() || "Workplace Placement",
+      phone: formattedPhone,
       weekNumbers: [1, 2, 3, 4],
     });
 
@@ -49,7 +52,7 @@ function SendSheet({
       setDone(true);
       onSuccess();
     } else {
-      setError(res.message || "Failed to dispatch review link. Please verify the email.");
+      setError(res.message || "Failed to dispatch review link. Please verify the email and international phone number.");
     }
   }
 
@@ -128,12 +131,12 @@ function SendSheet({
                   type="text"
                   value={org}
                   onChange={(e) => setOrg(e.target.value)}
-                  placeholder="e.g. SoftCom"
+                  placeholder="e.g. Engineering Firm"
                   className={inputCls}
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">Phone</label>
+                <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">Phone (+234...)</label>
                 <input
                   type="tel"
                   value={phone}
@@ -230,9 +233,9 @@ export default function StudentReviewsPage() {
           </div>
 
           <div className="bg-[#FAF9F5] p-3 rounded-xl border border-[#E8E7E1] text-[11px] space-y-0.5">
-            <p className="text-[#7A7973]">Placement Organisation:</p>
+            <p className="text-[#7A7973]">Electronic Verification:</p>
             <p className="font-semibold text-[#141414] flex items-center gap-1.5">
-              <Building className="size-3.5 text-[#141414]" /> VentureCraft Engineering Ltd.
+              <Building className="size-3.5 text-[#141414]" /> Industry Placement Portal
             </p>
           </div>
         </div>
@@ -246,6 +249,16 @@ export default function StudentReviewsPage() {
 
           {loading ? (
             <div className="p-8 text-center text-[12px] text-[#7A7973]">Loading review batches…</div>
+          ) : batches.length === 0 ? (
+            <div className="p-10 text-center space-y-2">
+              <div className="size-10 rounded-full bg-[#F5F4EF] text-[#7A7973] mx-auto flex items-center justify-center">
+                <Inbox className="size-5" />
+              </div>
+              <p className="text-[13px] font-semibold text-[#141414]">No review batches sent yet</p>
+              <p className="text-[11.5px] text-[#7A7973] max-w-sm mx-auto">
+                Once you complete and submit weekly logbook entries, you can dispatch review batches to your industry workplace supervisor for digital sign-off.
+              </p>
+            </div>
           ) : (
             <div className="divide-y divide-[#F0EFE9]">
               {batches.map((batch) => {

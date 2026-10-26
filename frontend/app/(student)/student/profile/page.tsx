@@ -7,7 +7,8 @@ import {
   ArrowLeft, Eye, EyeOff, LogOut, CheckCircle2,
   Building, KeyRound, AlertCircle
 } from "lucide-react";
-import { authApi, type StudentProfileData } from "@/lib/api/auth";
+import { authApi } from "@/lib/api/auth";
+import { studentApi } from "@/lib/api/student";
 
 function passwordStrength(pw: string): { level: 0 | 1 | 2 | 3; label: string; cls: string } {
   if (!pw) return { level: 0, label: "", cls: "" };
@@ -73,33 +74,51 @@ export default function StudentProfilePage() {
     programme: string;
     department: string;
     email: string;
+    coordinator: string;
+    session: string;
   }>({
-    name: "Ada Okafor",
-    matricNo: "CSC/2021/042",
+    name: "Student",
+    matricNo: "—",
     programme: "SWEP",
-    department: "Computer Science & Engineering",
-    email: "aokafor@student.oauife.edu.ng",
+    department: "Faculty of Technology",
+    email: "—",
+    coordinator: "Assigned upon session launch",
+    session: "Pending announcement",
   });
 
   useEffect(() => {
-    async function fetchProfile() {
+    async function fetchProfileData() {
       try {
-        const res = await authApi.studentProfile();
-        if (res.ok && res.data?.profile) {
-          const p = res.data.profile;
+        const [profRes, cohortRes] = await Promise.all([
+          authApi.studentProfile(),
+          studentApi.getCurrentCohort(),
+        ]);
+
+        if (profRes.ok && profRes.data?.profile) {
+          const p = profRes.data.profile;
+          const dept = typeof p.department === "string" ? p.department : (p.department as any)?.name || "Faculty of Technology";
+          const coordinator = cohortRes.ok && cohortRes.data?.cohort?.coordinator
+            ? cohortRes.data.cohort.coordinator
+            : "Assigned upon session launch";
+          const session = cohortRes.ok && cohortRes.data?.cohort?.session
+            ? cohortRes.data.cohort.session
+            : "Pending cohort launch";
+
           setProfile({
-            name: `${p.account.first_name} ${p.account.last_name}`,
+            name: `${p.account.first_name} ${p.account.last_name}`.trim(),
             matricNo: p.matric_no,
             programme: p.programme,
-            department: p.department?.name || "Faculty of Technology",
+            department: dept,
             email: p.account.email,
+            coordinator,
+            session,
           });
         }
       } catch {
         // Retain fallback profile
       }
     }
-    fetchProfile();
+    fetchProfileData();
   }, []);
 
   async function handlePasswordSubmit(e: React.FormEvent) {
@@ -163,7 +182,7 @@ export default function StudentProfilePage() {
         <div className="bg-white rounded-2xl border border-[#E8E7E1] p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="size-12 rounded-full bg-[#141414] text-white flex items-center justify-center text-[14px] font-bold shrink-0">
-              {profile.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+              {profile.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "ST"}
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -203,10 +222,10 @@ export default function StudentProfilePage() {
             <div className="space-y-0.5">
               <ProfileRow label="Matric Number" value={profile.matricNo} mono />
               <ProfileRow label="Programme" value={profile.programme} />
-              <ProfileRow label="Academic Year" value="2024 / 2025" />
+              <ProfileRow label="Academic Year" value={profile.session} />
               <ProfileRow label="Department" value={profile.department} />
               <ProfileRow label="Institutional Email" value={profile.email} mono />
-              <ProfileRow label="Faculty Coordinator" value="Dr. Babatunde" />
+              <ProfileRow label="Faculty Coordinator" value={profile.coordinator} />
             </div>
           </div>
 

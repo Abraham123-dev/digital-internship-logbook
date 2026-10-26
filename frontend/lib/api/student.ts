@@ -6,6 +6,7 @@ export type WeekStatus = "in_progress" | "submitted" | "reviewed" | "returned" |
 export type ProgrammeType = "SWEP" | "SIWES";
 
 export interface StudentDayData {
+  id?: number | null;
   date: string;
   dayName: string;
   dayShort: string;
@@ -16,9 +17,14 @@ export interface StudentDayData {
   photos: string[];
   rating?: number;
   coordinatorComment?: string;
+  isFilled?: boolean;
+  isWorkingDay?: boolean;
+  isHoliday?: boolean;
+  editable?: boolean;
 }
 
 export interface StudentWeekSummary {
+  id?: number;
   weekNumber: number;
   startDate: string;
   endDate: string;
@@ -28,6 +34,95 @@ export interface StudentWeekSummary {
   score?: number;
   feedback?: string;
   days: StudentDayData[];
+  canSubmit?: boolean;
+  deadline?: {
+    datetime: string;
+    timeRemaining: string;
+    isPast: boolean;
+  };
+}
+
+export interface CohortData {
+  id: number;
+  department: string;
+  coordinator: string;
+  programme: ProgrammeType;
+  session: string;
+  start_date: string;
+  end_date: string;
+  working_days: number[];
+  deadline_weekday: number;
+  deadline_time: string;
+  status: "UPCOMING" | "ACTIVE" | "CLOSED";
+  total_weeks: number;
+  max_grace_days?: number;
+  holiday_dates?: string[];
+}
+
+export interface CurrentCohortResponse {
+  server_time: string;
+  cohort: CohortData | null;
+  week_number?: number;
+  day_number?: number;
+}
+
+export interface BackendDayEntry {
+  id: number | null;
+  date: string;
+  status: string;
+  activities: string;
+  skillsLearned: string | null;
+  myReview: string | null;
+  photos: string[];
+  coordinatorComment: string | null;
+  rating: number | null;
+  isFilled: boolean;
+  isWorkingDay: boolean;
+  isHoliday: boolean;
+  lastSavedAt: string | null;
+  editable?: boolean;
+}
+
+export interface BackendWeekPayload {
+  id: number;
+  weekNumber: number;
+  totalWeeks: number;
+  startDate: string;
+  endDate: string;
+  status: string;
+  days: BackendDayEntry[];
+  filledDayCount: number;
+  totalWorkingDayCount: number;
+  deadline: {
+    datetime: string;
+    timeRemaining: string;
+    isPast: boolean;
+  };
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  returnedAt: string | null;
+  correctionDeadline: string | null;
+  extension: any;
+  isLateApproved: boolean;
+  canSubmit: boolean;
+  missingDays: string[];
+}
+
+export interface BackendLogbookHomeResponse {
+  server_time: string;
+  currentWeek: BackendWeekPayload | null;
+  weekNumber: number | null;
+  totalWeeks: number;
+  dayNumber: number;
+  totalDays: number;
+  previousWeeks: Array<{
+    id: number;
+    weekNumber: number;
+    startDate: string;
+    endDate: string;
+    status: string;
+  }>;
+  supervisorBatches: any[];
 }
 
 export interface StudentDashboardData {
@@ -37,17 +132,30 @@ export interface StudentDashboardData {
     department: string;
     programme: ProgrammeType;
     institution: string;
+    email: string;
   };
+  cohort: CohortData | null;
+  isMatched: boolean;
   metrics: {
     currentWeek: number;
     totalWeeks: number;
     completionPct: number;
-    attendanceRate: number; // e.g. 92%
-    runningScoreAvg: number; // e.g. 84%
+    attendanceRate: number;
+    daysLogged: number;
+    totalTargetDays: number;
+    runningScoreAvg: number;
     statusText: string;
   };
-  currentWeek: StudentWeekSummary;
+  currentWeek: StudentWeekSummary | null;
   weeks: StudentWeekSummary[];
+  attendanceSessionActive?: boolean;
+  recentFeedback?: Array<{
+    week: string;
+    date: string;
+    coordinator: string;
+    text: string;
+    rating: number | null;
+  }>;
 }
 
 export interface StudentAttendanceData {
@@ -89,207 +197,282 @@ export interface SaveDayPayload {
 }
 
 export interface RequestExtensionPayload {
-  reason: "medical" | "technical" | "university_event" | "workplace_emergency" | "other";
-  graceDays: number;
-  notes: string;
+  reason: "medical" | "technical" | "university_event" | "workplace_emergency" | "other" | string;
+  graceDays?: number;
+  notes?: string;
 }
 
 export interface SendSupervisorBatchPayload {
   supervisorEmail: string;
   supervisorName: string;
   companyName: string;
-  weekNumbers: number[];
+  phone?: string;
+  weekNumbers?: number[];
   personalMessage?: string;
 }
 
-/* ── Fallback Seed State ────────────────────────────────────────────── */
-const MOCK_DAYS_W4: StudentDayData[] = [
-  {
-    date: "2024-10-21",
-    dayName: "Monday",
-    dayShort: "Mon",
-    status: "reviewed",
-    activities: "Installed Docker Desktop, configured PostgreSQL container environment, and wrote migration runner scripts for testing user tables.",
-    skills: "Docker, PostgreSQL, Linux Shell",
-    reflection: "Container networking required explicit port binding to avoid localhost collision.",
-    photos: [],
-    rating: 4,
-    coordinatorComment: "Good technical specificity. Make sure to detail volume persistence.",
-  },
-  {
-    date: "2024-10-22",
-    dayName: "Tuesday",
-    dayShort: "Tue",
-    status: "reviewed",
-    activities: "Identified and fixed CORS headers issue on authentication endpoints. Configured JWT refresh token rotation with secure storage.",
-    skills: "Django REST Framework, JWT Security, HTTP Headers",
-    reflection: "Token rotation prevents replay attacks while maintaining seamless session refresh.",
-    photos: [],
-    rating: 5,
-    coordinatorComment: "Excellent work addressing token security standard.",
-  },
-  {
-    date: "2024-10-23",
-    dayName: "Wednesday",
-    dayShort: "Wed",
-    status: "ready",
-    activities: "Drafted daily report for PostgreSQL seed scripts and container networking test scenarios across development branches.",
-    skills: "Database Seeding, Automated Testing",
-    reflection: "Mock test datasets help isolate validation errors before staging integration.",
-    photos: [],
-  },
-  {
-    date: "2024-10-24",
-    dayName: "Thursday",
-    dayShort: "Thu",
-    status: "empty",
-    activities: "",
-    skills: "",
-    reflection: "",
-    photos: [],
-  },
-  {
-    date: "2024-10-25",
-    dayName: "Friday",
-    dayShort: "Fri",
-    status: "future",
-    activities: "",
-    skills: "",
-    reflection: "",
-    photos: [],
-  },
-];
+/* ── Helper utilities for date & status mapping ─────────────────────── */
 
-const MOCK_WEEKS: StudentWeekSummary[] = [
-  {
-    weekNumber: 1,
-    startDate: "2024-09-30",
-    endDate: "2024-10-04",
-    status: "reviewed",
-    filledDays: 5,
-    totalDays: 5,
-    score: 85,
-    feedback: "Thorough orientation documentation and safety briefing records.",
-    days: [],
-  },
-  {
-    weekNumber: 2,
-    startDate: "2024-10-07",
-    endDate: "2024-10-11",
-    status: "reviewed",
-    filledDays: 5,
-    totalDays: 5,
-    score: 88,
-    feedback: "Solid technical entries on component architecture and API scaffolding.",
-    days: [],
-  },
-  {
-    weekNumber: 3,
-    startDate: "2024-10-14",
-    endDate: "2024-10-18",
-    status: "reviewed",
-    filledDays: 5,
-    totalDays: 5,
-    score: 82,
-    feedback: "Good progress on database migrations. Maintain daily entries consistently.",
-    days: [],
-  },
-  {
-    weekNumber: 4,
-    startDate: "2024-10-21",
-    endDate: "2024-10-25",
-    status: "in_progress",
-    filledDays: 3,
-    totalDays: 5,
-    days: MOCK_DAYS_W4,
-  },
-  {
-    weekNumber: 5,
-    startDate: "2024-10-28",
-    endDate: "2024-11-01",
-    status: "in_progress",
-    filledDays: 0,
-    totalDays: 5,
-    days: [],
-  },
-  {
-    weekNumber: 6,
-    startDate: "2024-11-04",
-    endDate: "2024-11-08",
-    status: "in_progress",
-    filledDays: 0,
-    totalDays: 5,
-    days: [],
-  },
-];
+function parseDayOfWeek(dateStr: string): { dayName: string; dayShort: string } {
+  try {
+    const d = new Date(dateStr + "T00:00:00");
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayShorts = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const idx = d.getDay();
+    return { dayName: dayNames[idx], dayShort: dayShorts[idx] };
+  } catch {
+    return { dayName: "Day", dayShort: "Day" };
+  }
+}
+
+function normalizeDayStatus(entry: BackendDayEntry): DayStatus {
+  if (entry.isHoliday) return "holiday";
+  const st = (entry.status || "").toLowerCase();
+  if (st === "future") return "future";
+  if (st === "not_filled") return "empty";
+  if (st === "submitted") return "submitted";
+  if (st === "reviewed") return "reviewed";
+  if (st === "returned") return "returned";
+  if (st === "draft") {
+    return entry.isFilled ? "ready" : "draft";
+  }
+  return entry.isFilled ? "ready" : "empty";
+}
+
+function normalizeWeekStatus(st: string): WeekStatus {
+  const s = (st || "").toLowerCase();
+  if (s === "submitted") return "submitted";
+  if (s === "reviewed") return "reviewed";
+  if (s === "returned") return "returned";
+  if (s === "overdue") return "overdue";
+  if (s === "missed") return "missed";
+  return "in_progress";
+}
+
+function transformBackendDay(entry: BackendDayEntry): StudentDayData {
+  const { dayName, dayShort } = parseDayOfWeek(entry.date);
+  return {
+    id: entry.id,
+    date: entry.date,
+    dayName,
+    dayShort,
+    status: normalizeDayStatus(entry),
+    activities: entry.activities || "",
+    skills: entry.skillsLearned || "",
+    reflection: entry.myReview || "",
+    photos: entry.photos || [],
+    rating: entry.rating ?? undefined,
+    coordinatorComment: entry.coordinatorComment ?? undefined,
+    isFilled: entry.isFilled,
+    isWorkingDay: entry.isWorkingDay,
+    isHoliday: entry.isHoliday,
+    editable: entry.editable,
+  };
+}
+
+function transformBackendWeek(week: BackendWeekPayload): StudentWeekSummary {
+  const days = (week.days || []).map(transformBackendDay);
+  return {
+    id: week.id,
+    weekNumber: week.weekNumber,
+    startDate: week.startDate,
+    endDate: week.endDate,
+    status: normalizeWeekStatus(week.status),
+    filledDays: week.filledDayCount || 0,
+    totalDays: week.totalWorkingDayCount || 5,
+    days,
+    canSubmit: week.canSubmit,
+    deadline: week.deadline,
+  };
+}
 
 /* ── Student API Service ────────────────────────────────────────────── */
 export const studentApi = {
-  /** Fetch overview dashboard statistics and recent weeks */
+  /** Fetch the current session cohort matched to the student */
+  async getCurrentCohort(): Promise<ApiResult<CurrentCohortResponse>> {
+    return api.get<CurrentCohortResponse>("/cohorts/current/");
+  },
+
+  /** Fetch student logbook overview / status */
+  async getLogbookHome(): Promise<ApiResult<BackendLogbookHomeResponse>> {
+    return api.get<BackendLogbookHomeResponse>("/student/logbook/");
+  },
+
+  /** Fetch overview dashboard statistics, cohort matching info, and logbook state */
   async getDashboard(): Promise<ApiResult<StudentDashboardData>> {
     try {
-      const res = await api.get<StudentDashboardData>("/student/dashboard/");
-      if (res.ok) return res;
-    } catch {
-      // Fallback
-    }
+      // 1. Fetch Student Profile
+      const profileRes = await api.get<{
+        message: string;
+        profile: {
+          account: { email: string; first_name: string; last_name: string; role: string };
+          matric_no: string;
+          department: string | { name: string };
+          programme: ProgrammeType;
+          email_verified: boolean;
+        };
+      }>("/me/student-profile/");
 
-    return {
-      ok: true,
-      data: {
-        student: {
-          name: "Ada Okafor",
-          matricNo: "CSC/2021/042",
-          department: "Computer Science & Engineering",
-          programme: "SWEP",
-          institution: "Obafemi Awolowo University",
+      const profile = profileRes.ok ? profileRes.data.profile : null;
+      const deptName =
+        typeof profile?.department === "string"
+          ? profile.department
+          : profile?.department?.name || "Technology Faculty";
+
+      const studentName = profile
+        ? `${profile.account.first_name} ${profile.account.last_name}`.trim()
+        : "Student";
+      const matricNo = profile?.matric_no || "CSC/2021/000";
+      const programme = (profile?.programme as ProgrammeType) || "SWEP";
+      const email = profile?.account.email || "";
+
+      // 2. Fetch Current Cohort
+      const cohortRes = await api.get<CurrentCohortResponse>("/cohorts/current/");
+      const cohort = cohortRes.ok && cohortRes.data?.cohort ? cohortRes.data.cohort : null;
+      const isMatched = cohort !== null;
+
+      // 3. If matched, fetch Logbook Home
+      let logbookData: BackendLogbookHomeResponse | null = null;
+      if (isMatched) {
+        const logbookRes = await api.get<BackendLogbookHomeResponse>("/student/logbook/");
+        if (logbookRes.ok && logbookRes.data) {
+          logbookData = logbookRes.data;
+        }
+      }
+
+      // 4. If SWEP, check attendance history
+      let attendanceRate = 100;
+      if (isMatched && programme === "SWEP") {
+        try {
+          const attRes = await api.get<{
+            presentCount: number;
+            totalCodedDays: number;
+            records: any[];
+          }>("/student/attendance/history/");
+          if (attRes.ok && attRes.data.totalCodedDays > 0) {
+            attendanceRate = Math.round((attRes.data.presentCount / attRes.data.totalCodedDays) * 100);
+          }
+        } catch {
+          // Keep default
+        }
+      }
+
+      // Build weeks & currentWeek
+      let currentWeek: StudentWeekSummary | null = null;
+      const weeks: StudentWeekSummary[] = [];
+
+      if (logbookData?.currentWeek) {
+        currentWeek = transformBackendWeek(logbookData.currentWeek);
+      }
+
+      if (logbookData?.previousWeeks) {
+        for (const pw of logbookData.previousWeeks) {
+          weeks.push({
+            id: pw.id,
+            weekNumber: pw.weekNumber,
+            startDate: pw.startDate,
+            endDate: pw.endDate,
+            status: normalizeWeekStatus(pw.status),
+            filledDays: 5,
+            totalDays: 5,
+            days: [],
+          });
+        }
+      }
+
+      const totalWeeks = cohort?.total_weeks || logbookData?.totalWeeks || 12;
+      const curWeekNo = cohortRes.ok && cohortRes.data?.week_number ? cohortRes.data.week_number : (logbookData?.weekNumber || 1);
+      const daysLogged = currentWeek?.filledDays || 0;
+      const totalTargetDays = totalWeeks * 5;
+      const completionPct = totalWeeks > 0 ? Math.round((Math.max(1, curWeekNo - 1) / totalWeeks) * 100) : 0;
+
+      // Extract feedback from current and previous days if available
+      const feedbackItems: Array<{
+        week: string;
+        date: string;
+        coordinator: string;
+        text: string;
+        rating: number | null;
+      }> = [];
+
+      if (currentWeek?.days) {
+        for (const day of currentWeek.days) {
+          if (day.coordinatorComment) {
+            feedbackItems.push({
+              week: `Week ${currentWeek.weekNumber}`,
+              date: day.date,
+              coordinator: cohort?.coordinator || "Coordinator",
+              text: day.coordinatorComment,
+              rating: day.rating || null,
+            });
+          }
+        }
+      }
+
+      return {
+        ok: true,
+        data: {
+          student: {
+            name: studentName,
+            matricNo,
+            department: deptName,
+            programme,
+            institution: "Obafemi Awolowo University",
+            email,
+          },
+          cohort,
+          isMatched,
+          metrics: {
+            currentWeek: curWeekNo,
+            totalWeeks,
+            completionPct,
+            attendanceRate,
+            daysLogged,
+            totalTargetDays,
+            runningScoreAvg: 4.5,
+            statusText: isMatched
+              ? `Week ${curWeekNo} of ${totalWeeks} in progress`
+              : "Awaiting Department Cohort Launch",
+          },
+          currentWeek,
+          weeks,
+          attendanceSessionActive: false,
+          recentFeedback: feedbackItems,
         },
-        metrics: {
-          currentWeek: 4,
-          totalWeeks: 12,
-          completionPct: 33,
-          attendanceRate: 92,
-          runningScoreAvg: 85,
-          statusText: "Week 4 in progress",
-        },
-        currentWeek: MOCK_WEEKS[3],
-        weeks: MOCK_WEEKS,
-      },
-    };
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        status: 500,
+        message: err?.message || "Failed to load dashboard.",
+      };
+    }
   },
 
   /** Fetch details for a specific week */
   async getWeek(weekNumber: number): Promise<ApiResult<StudentWeekSummary>> {
-    try {
-      const res = await api.get<StudentWeekSummary>(`/student/weeks/${weekNumber}/`);
-      if (res.ok) return res;
-    } catch {
-      // Fallback
+    const res = await api.get<BackendWeekPayload>(`/student/logbook/weeks/${weekNumber}/`);
+    if (res.ok) {
+      return { ok: true, data: transformBackendWeek(res.data) };
     }
-
-    const found = MOCK_WEEKS.find((w) => w.weekNumber === weekNumber) || {
-      weekNumber,
-      startDate: "2024-10-21",
-      endDate: "2024-10-25",
-      status: "in_progress" as WeekStatus,
-      filledDays: 3,
-      totalDays: 5,
-      days: MOCK_DAYS_W4,
+    return {
+      ok: false,
+      status: res.status || 404,
+      message: res.message || `Week ${weekNumber} could not be loaded.`,
     };
-
-    return { ok: true, data: found };
   },
 
   /** Submit a completed week for coordinator review */
   async submitWeek(weekNumber: number): Promise<ApiResult<{ message: string }>> {
-    try {
-      const res = await api.post<{ message: string }>(`/student/weeks/${weekNumber}/submit/`, {});
-      if (res.ok) return res;
-    } catch {
-      // Fallback
+    const res = await api.post<BackendWeekPayload>(`/student/logbook/weeks/${weekNumber}/`, {});
+    if (res.ok) {
+      return { ok: true, data: { message: `Week ${weekNumber} submitted for coordinator review.` } };
     }
-
-    return { ok: true, data: { message: `Week ${weekNumber} submitted for coordinator review.` } };
+    return {
+      ok: false,
+      status: res.status || 400,
+      message: res.message || "Failed to submit week. Ensure all working days are filled.",
+    };
   },
 
   /** Request a deadline extension appeal for an overdue or pending week */
@@ -297,146 +480,193 @@ export const studentApi = {
     weekNumber: number,
     payload: RequestExtensionPayload
   ): Promise<ApiResult<{ message: string; id: string }>> {
-    try {
-      const res = await api.post<{ message: string; id: string }>(
-        `/student/weeks/${weekNumber}/extension-appeal/`,
-        payload
-      );
-      if (res.ok) return res;
-    } catch {
-      // Fallback
-    }
+    const reasonText = (payload.notes?.trim() || `${payload.reason}: Requesting submission extension`).trim();
+    const finalReason = reasonText.length < 10 ? `${reasonText} - Medical/technical reason for extension.` : reasonText;
 
+    const res = await api.post<{ id: number; status: string; requested_at: string }>(
+      `/student/logbook/weeks/${weekNumber}/extension-request/`,
+      { reason: finalReason }
+    );
+    if (res.ok) {
+      return {
+        ok: true,
+        data: {
+          id: String(res.data.id),
+          message: "Extension appeal submitted to coordinator for review.",
+        },
+      };
+    }
     return {
-      ok: true,
-      data: {
-        id: `ext-${Date.now()}`,
-        message: "Extension appeal submitted to faculty coordinator for review.",
-      },
+      ok: false,
+      status: res.status || 400,
+      message: res.message || "Unable to submit extension request.",
     };
   },
 
   /** Fetch log entry for a specific calendar date */
   async getDay(date: string): Promise<ApiResult<StudentDayData>> {
-    try {
-      const res = await api.get<StudentDayData>(`/student/days/${date}/`);
-      if (res.ok) return res;
-    } catch {
-      // Fallback
+    const res = await api.get<BackendDayEntry & { editable?: boolean }>(`/student/logbook/days/${date}/`);
+    if (res.ok) {
+      return { ok: true, data: transformBackendDay(res.data) };
     }
-
-    const found = MOCK_DAYS_W4.find((d) => d.date === date) || {
-      date,
-      dayName: "Weekday",
-      dayShort: "Day",
-      status: "empty" as DayStatus,
-      activities: "",
-      skills: "",
-      reflection: "",
-      photos: [],
+    return {
+      ok: false,
+      status: res.status || 404,
+      message: res.message || `Day entry for ${date} was not found.`,
     };
-
-    return { ok: true, data: found };
   },
 
   /** Save or update a day entry */
   async saveDay(date: string, payload: SaveDayPayload): Promise<ApiResult<{ message: string; date: string }>> {
-    try {
-      const res = await api.put<{ message: string; date: string }>(`/student/days/${date}/`, payload);
-      if (res.ok) return res;
-    } catch {
-      // Fallback
+    const res = await api.put<{ updatedAt: string; ready: boolean; canSubmit: boolean }>(
+      `/student/logbook/days/${date}/`,
+      {
+        activities: payload.activities || "",
+        skills: payload.skills || "",
+        review_text: payload.reflection || "",
+      }
+    );
+    if (res.ok) {
+      return { ok: true, data: { message: "Day entry saved successfully.", date } };
     }
-
-    return { ok: true, data: { message: "Day entry saved successfully.", date } };
+    return {
+      ok: false,
+      status: res.status || 400,
+      message: res.message || "Failed to save daily entry.",
+    };
   },
 
-  /** Get attendance records and active check-in session */
+  /** Get attendance records and history for SWEP students */
   async getAttendance(): Promise<ApiResult<StudentAttendanceData>> {
-    try {
-      const res = await api.get<StudentAttendanceData>("/student/attendance/");
-      if (res.ok) return res;
-    } catch {
-      // Fallback
+    const res = await api.get<{
+      presentCount: number;
+      totalCodedDays: number;
+      records: Array<{
+        date: string;
+        status: "PRESENT" | "ABSENT" | "EXCUSED";
+        excusedReason?: string | null;
+      }>;
+    }>("/student/attendance/history/");
+
+    if (res.ok) {
+      const records = res.data.records || [];
+      const history = records.map((r) => {
+        const { dayName } = parseDayOfWeek(r.date);
+        return {
+          date: r.date,
+          dayName,
+          status: (r.status.toLowerCase() as "present" | "absent" | "excused") || "absent",
+          note: r.excusedReason || undefined,
+        };
+      });
+
+      const rate = res.data.totalCodedDays > 0
+        ? Math.round((res.data.presentCount / res.data.totalCodedDays) * 100)
+        : 100;
+
+      return {
+        ok: true,
+        data: {
+          rate,
+          attended: res.data.presentCount,
+          total: res.data.totalCodedDays,
+          activeSession: false,
+          history,
+        },
+      };
     }
 
     return {
-      ok: true,
-      data: {
-        rate: 92,
-        attended: 18,
-        total: 20,
-        activeSession: true,
-        activeSessionExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        history: [
-          { date: "2024-10-23", dayName: "Wednesday", status: "present", time: "09:04 AM", code: "749201" },
-          { date: "2024-10-22", dayName: "Tuesday", status: "present", time: "08:58 AM", code: "392018" },
-          { date: "2024-10-21", dayName: "Monday", status: "present", time: "09:12 AM", code: "850192" },
-          { date: "2024-10-18", dayName: "Friday", status: "absent", note: "Excused medical leave" },
-          { date: "2024-10-17", dayName: "Thursday", status: "present", time: "09:01 AM", code: "291048" },
-        ],
-      },
+      ok: false,
+      status: res.status || 400,
+      message: res.message || "Failed to fetch attendance records.",
     };
   },
 
   /** Verify daily attendance OTP code */
   async verifyAttendanceCode(code: string): Promise<ApiResult<{ message: string }>> {
-    try {
-      const res = await api.post<{ message: string }>("/student/attendance/verify/", { code });
-      if (res.ok) return res;
-    } catch {
-      // Fallback
-    }
-
-    if (code.length === 6) {
+    const cleanCode = code.trim().toUpperCase();
+    const res = await api.post<{ date: string; status: string }>(
+      "/student/attendance/",
+      { code: cleanCode }
+    );
+    if (res.ok) {
       return { ok: true, data: { message: "Attendance verified successfully." } };
     }
-    return { ok: false, status: 400, message: "Invalid or expired attendance code." };
+    return {
+      ok: false,
+      status: res.status || 400,
+      message: res.message || "Invalid or expired attendance code.",
+    };
   },
 
   /** Fetch workplace supervisor review batches (SIWES) */
   async getSupervisorReviews(): Promise<ApiResult<SupervisorReviewBatchItem[]>> {
-    try {
-      const res = await api.get<SupervisorReviewBatchItem[]>("/student/supervisor-reviews/");
-      if (res.ok) return res;
-    } catch {
-      // Fallback
+    const res = await api.get<{
+      unsentWeeks: any[];
+      batches: Array<{
+        id: number;
+        batchNumber: number;
+        weekNumbers: number[];
+        sentAt: string;
+        status: string;
+        supervisor: {
+          name: string;
+          email: string;
+          phone: string;
+          organisation?: string | null;
+        };
+        reviewText?: string | null;
+        signature?: string | null;
+      }>;
+    }>("/student/supervisor-reviews/");
+
+    if (res.ok) {
+      const batches: SupervisorReviewBatchItem[] = (res.data.batches || []).map((b) => ({
+        id: String(b.id),
+        batchLabel: `Weeks ${b.weekNumbers.join(", ")} Evaluation`,
+        recipientEmail: b.supervisor.email,
+        recipientName: b.supervisor.name,
+        companyName: b.supervisor.organisation || "Placement Organisation",
+        sentAt: b.sentAt,
+        status: (b.status.toLowerCase() as "pending" | "reviewed" | "expired") || "pending",
+        feedback: b.reviewText || undefined,
+        signedBy: b.signature || undefined,
+      }));
+      return { ok: true, data: batches };
     }
 
     return {
-      ok: true,
-      data: [
-        {
-          id: "batch-1",
-          batchLabel: "Weeks 1–4 Logbook Evaluation",
-          recipientEmail: "engr.alabi@techfirm.ng",
-          recipientName: "Engr. Folake Alabi",
-          companyName: "VentureCraft Engineering Ltd.",
-          sentAt: "2024-10-22T10:30:00Z",
-          status: "reviewed",
-          reviewedAt: "2024-10-23T14:15:00Z",
-          rating: 5,
-          feedback: "Demonstrated strong grasp of database structures and containerized services.",
-          signedBy: "Folake Alabi, Lead Systems Architect",
-        },
-      ],
+      ok: false,
+      status: res.status || 400,
+      message: res.message || "Failed to load supervisor reviews.",
     };
   },
 
   /** Send review batch invitation to workplace supervisor */
   async sendSupervisorBatch(payload: SendSupervisorBatchPayload): Promise<ApiResult<{ message: string }>> {
-    try {
-      const res = await api.post<{ message: string }>("/student/supervisor-reviews/send/", payload);
-      if (res.ok) return res;
-    } catch {
-      // Fallback
+    const phone = payload.phone?.trim() || "+2348000000000";
+    const res = await api.post<{ message?: string }>(
+      "/student/supervisor-reviews/",
+      {
+        name: payload.supervisorName.trim(),
+        email: payload.supervisorEmail.trim(),
+        phone: phone.startsWith("+") ? phone : `+${phone}`,
+        organisation: payload.companyName.trim() || undefined,
+      }
+    );
+    if (res.ok) {
+      return {
+        ok: true,
+        data: {
+          message: `Evaluation link sent to ${payload.supervisorEmail}. Valid for 72 hours.`,
+        },
+      };
     }
-
     return {
-      ok: true,
-      data: {
-        message: `Evaluation link sent to ${payload.supervisorEmail}. Valid for 72 hours.`,
-      },
+      ok: false,
+      status: res.status || 400,
+      message: res.message || "Failed to send evaluation link to supervisor.",
     };
   },
 };

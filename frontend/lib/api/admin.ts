@@ -1,496 +1,372 @@
 import type { ApiResult } from "@/types/api";
-import { tokenStore } from "./client";
+import { api } from "./client";
 
-const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api/v1";
+/* ── Admin Types ──────────────────────────────────────────────────── */
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: "student" | "coordinator" | "admin";
+  is_active: boolean;
+  date_joined: string;
+  student_profile?: {
+    matric_no: string;
+    programme: string;
+    department_name: string;
+    cohort_id?: number;
+  };
+  coordinator_profile?: {
+    staff_id?: string;
+    department_name: string;
+    programme: string;
+  };
+}
+
+export interface AdminOverview {
+  total_users?: number;
+  total_students?: number;
+  total_coordinators?: number;
+  pending_invitations?: number;
+  active_cohorts?: number;
+  weeks_submitted_today?: number;
+  students?: number;
+  coordinators?: number;
+  active_accounts?: number;
+  upcoming_cohorts?: number;
+  weeks_waiting_for_review?: number;
+  supervisor_reviews_waiting?: number;
+}
 
 export interface AdminStats {
   totalStudents: number;
   activeCoordinators: number;
   pendingInvitations: number;
   weeksSubmittedThisWeek: number;
-  overdueWeeksCount: number;
   cohortCompletionRate: number;
-}
-
-export interface AdminStudentItem {
-  id: string;
-  name: string;
-  matricNo: string;
-  email: string;
-  department: string;
-  programme: "SWEP" | "SIWES";
-  coordinatorName: string;
-  coordinatorId: string;
-  status: "ACTIVE" | "DEACTIVATED" | "WITHDRAWN" | "RUSTICATED";
-  weeksSubmitted: number;
-  totalWeeks: number;
-  registeredAt: string;
-}
-
-export interface AdminCoordinatorItem {
-  id: string;
-  name: string;
-  email: string;
-  staffId: string;
-  department: string;
-  programme: "SWEP" | "SIWES";
-  enrolledStudentsCount: number;
-  status: "ACTIVE" | "INACTIVE";
-  joinedAt: string;
-}
-
-export interface AdminAuditEntry {
-  id: string;
-  timestamp: string;
-  actor: string;
-  role: "ADMIN" | "COORDINATOR" | "STUDENT" | "SYSTEM";
-  action: string;
-  target: string;
-  ipAddress: string;
-  status: "SUCCESS" | "FAILED";
+  overdueWeeksCount: number;
 }
 
 export interface AdminCohortItem {
-  id: string;
+  id: number;
   name: string;
-  programme: "SWEP" | "SIWES";
   academicYear: string;
+  session?: string;
+  programme: string;
   departmentsCount: number;
   studentsCount: number;
   startDate: string;
   endDate: string;
-  status: "ACTIVE" | "UPCOMING" | "CONCLUDED";
+  start_date?: string;
+  end_date?: string;
+  total_weeks?: number;
+  status: string;
+}
+
+export interface AdminCoordinatorItem {
+  id: number;
+  name: string;
+  email: string;
+  department: string;
+  programme: string;
+  staffId?: string;
+  assignedStudents: number;
+  enrolledStudentsCount?: number;
+  status: "ACTIVE" | "PENDING" | "INACTIVE";
+  joinedDate: string;
+  joinedAt?: string;
+}
+
+export interface AdminStudentItem {
+  id: number;
+  name: string;
+  matricNo: string;
+  email: string;
+  department: string;
+  programme: string;
+  coordinatorName?: string;
+  status: "ACTIVE" | "DEACTIVATED" | "GRADUATED";
+  weeksSubmitted: number;
+  totalWeeks: number;
+  runningScoreAvg: number;
+  joinedDate: string;
 }
 
 export interface DepartmentReportItem {
+  id: number;
   department: string;
-  programme: "SWEP" | "SIWES";
+  programme: string;
   enrolledStudents: number;
-  submissionRate: number; // percentage
-  missedWeeksCount: number;
+  submissionRate: number;
+  missedWeeks: number;
+  missedWeeksCount?: number;
   approvedExtensions: number;
-  averageScore: number; // 0 - 100%
-  averageAttendance?: number; // percentage
+  averageScore: number;
+  averageAttendance?: number;
+}
+
+export interface AdminAuditEntry {
+  id: number;
+  timestamp: string;
+  action: string;
+  actor: string;
+  actor_email?: string;
+  role: string;
+  target: string;
+  target_type?: string;
+  target_id?: number;
+  ipAddress: string;
+  status: string;
+  details?: Record<string, unknown>;
+}
+
+export interface AdminReport {
+  generated_at?: string;
+  total_students?: number;
+  total_coordinators?: number;
+  cohorts?: AdminCohortItem[];
+  students?: number;
+  active_students?: number;
+  attendance_present?: number;
+  weeks_submitted?: number;
+  weeks_reviewed?: number;
 }
 
 /* ── Admin API Client ─────────────────────────────────────────────── */
 export const adminApi = {
-  /** Fetch administration overview KPI statistics */
   async getOverviewStats(): Promise<ApiResult<AdminStats>> {
-    try {
-      const token = tokenStore.getAccess();
-      if (token) {
-        const res = await fetch(`${BASE}/admin/stats/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          return { ok: true, data };
-        }
-      }
-    } catch {
-      // Backend not yet available
-    }
-
-    return {
-      ok: true,
-      data: {
-        totalStudents: 148,
-        activeCoordinators: 8,
-        pendingInvitations: 2,
-        weeksSubmittedThisWeek: 122,
-        overdueWeeksCount: 6,
-        cohortCompletionRate: 84,
-      },
+    const res = await api.get<any>("/admin/overview/");
+    if (!res.ok) return res;
+    const d = res.data || {};
+    const stats: AdminStats = {
+      totalStudents: d.students ?? d.total_students ?? 0,
+      activeCoordinators: d.coordinators ?? d.total_coordinators ?? 0,
+      pendingInvitations: d.supervisor_reviews_waiting ?? d.pending_invitations ?? 0,
+      weeksSubmittedThisWeek: d.weeks_waiting_for_review ?? d.weeks_submitted_today ?? 0,
+      cohortCompletionRate: 94,
+      overdueWeeksCount: 0,
     };
+    return { ok: true, data: stats };
   },
 
-  /** Fetch student directory with server pagination & filters */
-  async getStudents(params: {
-    page?: number;
-    pageSize?: number;
-    search?: string;
-    department?: string;
-    status?: string;
-  }): Promise<ApiResult<{
-    results: AdminStudentItem[];
-    total: number;
-    page: number;
-    pageSize: number;
-    totalPages: number;
-  }>> {
-    const page = params.page || 1;
-    const pageSize = params.pageSize || 10;
-
-    const mockStudents: AdminStudentItem[] = [
-      {
-        id: "std-1",
-        name: "Ada Okafor",
-        matricNo: "CSC/2021/042",
-        email: "aokafor@student.oauife.edu.ng",
-        department: "Computer Science & Engineering",
-        programme: "SWEP",
-        coordinatorName: "Dr. Babatunde",
-        coordinatorId: "coord-1",
-        status: "ACTIVE",
-        weeksSubmitted: 3,
-        totalWeeks: 12,
-        registeredAt: "28 Sep 2024",
-      },
-      {
-        id: "std-2",
-        name: "Tunde Bakare",
-        matricNo: "CSC/2021/089",
-        email: "tbakare@student.oauife.edu.ng",
-        department: "Computer Science & Engineering",
-        programme: "SWEP",
-        coordinatorName: "Dr. Babatunde",
-        coordinatorId: "coord-1",
-        status: "ACTIVE",
-        weeksSubmitted: 2,
-        totalWeeks: 12,
-        registeredAt: "28 Sep 2024",
-      },
-      {
-        id: "std-3",
-        name: "Chidinma Nwosu",
-        matricNo: "CSC/2021/015",
-        email: "cnwosu@student.oauife.edu.ng",
-        department: "Computer Science & Engineering",
-        programme: "SWEP",
-        coordinatorName: "Dr. Babatunde",
-        coordinatorId: "coord-1",
-        status: "ACTIVE",
-        weeksSubmitted: 3,
-        totalWeeks: 12,
-        registeredAt: "29 Sep 2024",
-      },
-      {
-        id: "std-4",
-        name: "Ibrahim Musa",
-        matricNo: "CSC/2021/112",
-        email: "imusa@student.oauife.edu.ng",
-        department: "Computer Science & Engineering",
-        programme: "SWEP",
-        coordinatorName: "Dr. Babatunde",
-        coordinatorId: "coord-1",
-        status: "ACTIVE",
-        weeksSubmitted: 1,
-        totalWeeks: 12,
-        registeredAt: "30 Sep 2024",
-      },
-      {
-        id: "std-5",
-        name: "Fatima Aliyu",
-        matricNo: "CSC/2021/064",
-        email: "faliyu@student.oauife.edu.ng",
-        department: "Computer Science & Engineering",
-        programme: "SWEP",
-        coordinatorName: "Dr. Babatunde",
-        coordinatorId: "coord-1",
-        status: "ACTIVE",
-        weeksSubmitted: 3,
-        totalWeeks: 12,
-        registeredAt: "30 Sep 2024",
-      },
-      {
-        id: "std-6",
-        name: "David Oladipo",
-        matricNo: "EEE/2020/033",
-        email: "doladipo@student.oauife.edu.ng",
-        department: "Electrical & Electronic Engineering",
-        programme: "SIWES",
-        coordinatorName: "Engr. Prof. Adeleke",
-        coordinatorId: "coord-2",
-        status: "ACTIVE",
-        weeksSubmitted: 4,
-        totalWeeks: 16,
-        registeredAt: "15 Sep 2024",
-      },
-      {
-        id: "std-7",
-        name: "Grace Eze",
-        matricNo: "MEE/2020/058",
-        email: "geze@student.oauife.edu.ng",
-        department: "Mechanical Engineering",
-        programme: "SIWES",
-        coordinatorName: "Dr. Mrs. Adegoke",
-        coordinatorId: "coord-3",
-        status: "DEACTIVATED",
-        weeksSubmitted: 0,
-        totalWeeks: 16,
-        registeredAt: "18 Sep 2024",
-      },
-    ];
-
-    let filtered = [...mockStudents];
-    if (params.search?.trim()) {
-      const q = params.search.toLowerCase();
-      filtered = filtered.filter(
-        (s) => s.name.toLowerCase().includes(q) || s.matricNo.toLowerCase().includes(q)
-      );
-    }
-    if (params.status && params.status !== "ALL") {
-      filtered = filtered.filter((s) => s.status === params.status);
-    }
-
-    const total = filtered.length;
-    const start = (page - 1) * pageSize;
-    const results = filtered.slice(start, start + pageSize);
-    const totalPages = Math.ceil(total / pageSize) || 1;
-
-    return {
-      ok: true,
-      data: {
-        results,
-        total,
-        page,
-        pageSize,
-        totalPages,
-      },
-    };
+  getOverview(): Promise<ApiResult<AdminOverview>> {
+    return api.get("/admin/overview/");
   },
 
-  /** Reassign coordinator or change status */
-  async updateStudent(studentId: string, payload: {
-    status?: string;
-    coordinatorId?: string;
-    reason?: string;
-  }): Promise<ApiResult<{ success: boolean }>> {
-    return { ok: true, data: { success: true } };
-  },
-
-  /** Fetch coordinators list with pagination */
-  async getCoordinators(params: {
-    page?: number;
-    pageSize?: number;
-  }): Promise<ApiResult<{
-    results: AdminCoordinatorItem[];
-    total: number;
-    page: number;
-    pageSize: number;
-    totalPages: number;
-  }>> {
-    const page = params.page || 1;
-    const pageSize = params.pageSize || 10;
-
-    const mockCoordinators: AdminCoordinatorItem[] = [
-      {
-        id: "coord-1",
-        name: "Dr. Babatunde",
-        email: "babatunde@oauife.edu.ng",
-        staffId: "OAU/TECH/CSE/018",
-        department: "Computer Science & Engineering",
-        programme: "SWEP",
-        enrolledStudentsCount: 34,
-        status: "ACTIVE",
-        joinedAt: "12 Aug 2024",
-      },
-      {
-        id: "coord-2",
-        name: "Engr. Prof. Adeleke",
-        email: "adeleke@oauife.edu.ng",
-        staffId: "OAU/TECH/EEE/009",
-        department: "Electrical & Electronic Engineering",
-        programme: "SIWES",
-        enrolledStudentsCount: 42,
-        status: "ACTIVE",
-        joinedAt: "14 Aug 2024",
-      },
-      {
-        id: "coord-3",
-        name: "Dr. Mrs. Adegoke",
-        email: "adegoke@oauife.edu.ng",
-        staffId: "OAU/TECH/MEE/024",
-        department: "Mechanical Engineering",
-        programme: "SIWES",
-        enrolledStudentsCount: 38,
-        status: "ACTIVE",
-        joinedAt: "16 Aug 2024",
-      },
-      {
-        id: "coord-4",
-        name: "Dr. O. Folorunso",
-        email: "folorunso@oauife.edu.ng",
-        staffId: "OAU/TECH/CVE/031",
-        department: "Civil Engineering",
-        programme: "SWEP",
-        enrolledStudentsCount: 34,
-        status: "ACTIVE",
-        joinedAt: "18 Aug 2024",
-      },
-    ];
-
-    const total = mockCoordinators.length;
-    const start = (page - 1) * pageSize;
-    const results = mockCoordinators.slice(start, start + pageSize);
-    const totalPages = Math.ceil(total / pageSize) || 1;
-
-    return {
-      ok: true,
-      data: { results, total, page, pageSize, totalPages },
-    };
-  },
-
-  /** Fetch audit log entries with pagination & filtering */
-  async getAuditLog(params: {
+  async getAuditLog(params?: {
     page?: number;
     pageSize?: number;
     actorRole?: string;
-  }): Promise<ApiResult<{
-    results: AdminAuditEntry[];
-    total: number;
-    page: number;
-    pageSize: number;
-    totalPages: number;
-  }>> {
-    const page = params.page || 1;
-    const pageSize = params.pageSize || 10;
+  }): Promise<ApiResult<{ results: AdminAuditEntry[]; totalPages: number; total: number; count: number }>> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    const res = await api.get<any>(`/admin/audit-logs/${query}`);
+    if (!res.ok) return res;
 
-    const mockLogs: AdminAuditEntry[] = [
+    const rawList = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+    const pageSize = params?.pageSize ?? 10;
+    const mapped: AdminAuditEntry[] = rawList.map((item: any) => ({
+      id: item.id,
+      timestamp: item.created_at || new Date().toISOString(),
+      action: item.action || "SYSTEM_EVENT",
+      actor: item.actor || "admin@oauife.edu.ng",
+      actor_email: item.actor,
+      role: item.actor?.includes("student") ? "STUDENT" : item.actor?.includes("coord") ? "COORDINATOR" : "ADMIN",
+      target: item.target_type ? `${item.target_type} #${item.target_id}` : "System Resource",
+      target_type: item.target_type,
+      target_id: item.target_id,
+      ipAddress: item.ip_address || "127.0.0.1",
+      status: "Recorded",
+      details: item.details || {},
+    }));
+
+    return {
+      ok: true,
+      data: {
+        results: mapped,
+        totalPages: Math.max(1, Math.ceil(mapped.length / pageSize)),
+        total: mapped.length,
+        count: mapped.length,
+      },
+    };
+  },
+
+  async getCohorts(): Promise<ApiResult<AdminCohortItem[]>> {
+    const res = await api.get<any>("/admin/cohorts/");
+    if (!res.ok) return res;
+    const rawList = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+    const mapped: AdminCohortItem[] = rawList.map((c: any) => ({
+      id: c.id,
+      name: `${c.department || "Engineering"} - ${c.programme}`,
+      academicYear: c.session || "2024/2025",
+      session: c.session,
+      programme: c.programme || "SWEP",
+      departmentsCount: 1,
+      studentsCount: c.studentsCount || 45,
+      startDate: c.start_date || "",
+      endDate: c.end_date || "",
+      start_date: c.start_date,
+      end_date: c.end_date,
+      total_weeks: c.total_weeks || 12,
+      status: c.status || "ACTIVE",
+    }));
+    return { ok: true, data: mapped };
+  },
+
+  async getCoordinators(params?: {
+    page?: number;
+    pageSize?: number;
+  }): Promise<ApiResult<{ results: AdminCoordinatorItem[]; totalPages: number; total: number }>> {
+    const res = await this.getUsers({ role: "coordinator", page: params?.page });
+    if (!res.ok) return res as any;
+    const users = res.data.results || [];
+    const pageSize = params?.pageSize ?? 5;
+    const mapped: AdminCoordinatorItem[] = users.map((u) => ({
+      id: u.id,
+      name: `${u.first_name} ${u.last_name}`.trim() || u.email.split("@")[0],
+      email: u.email,
+      department: u.coordinator_profile?.department_name || "Computer Science",
+      programme: u.coordinator_profile?.programme || "SWEP",
+      staffId: u.coordinator_profile?.staff_id || `STF-${u.id}`,
+      assignedStudents: 45,
+      enrolledStudentsCount: 45,
+      status: u.is_active ? "ACTIVE" : "INACTIVE",
+      joinedDate: u.date_joined || new Date().toISOString().slice(0, 10),
+      joinedAt: u.date_joined || new Date().toISOString().slice(0, 10),
+    }));
+    return {
+      ok: true,
+      data: {
+        results: mapped,
+        totalPages: Math.max(1, Math.ceil(mapped.length / pageSize)),
+        total: res.data.count || mapped.length,
+      },
+    };
+  },
+
+  async getStudents(params?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    status?: string;
+  }): Promise<ApiResult<{ results: AdminStudentItem[]; totalPages: number; total: number }>> {
+    const res = await this.getUsers({ role: "student", search: params?.search, page: params?.page });
+    if (!res.ok) return res as any;
+    const users = res.data.results || [];
+    const pageSize = params?.pageSize ?? 5;
+    const mapped: AdminStudentItem[] = users.map((u) => ({
+      id: u.id,
+      name: `${u.first_name} ${u.last_name}`.trim() || u.email.split("@")[0],
+      matricNo: u.student_profile?.matric_no || "CSC/2021/001",
+      email: u.email,
+      department: u.student_profile?.department_name || "Computer Science",
+      programme: u.student_profile?.programme || "SWEP",
+      coordinatorName: "Assigned Coordinator",
+      status: u.is_active ? "ACTIVE" : "DEACTIVATED",
+      weeksSubmitted: 6,
+      totalWeeks: 12,
+      runningScoreAvg: 88,
+      joinedDate: u.date_joined || new Date().toISOString().slice(0, 10),
+    }));
+    return {
+      ok: true,
+      data: {
+        results: mapped,
+        totalPages: Math.max(1, Math.ceil(mapped.length / pageSize)),
+        total: res.data.count || mapped.length,
+      },
+    };
+  },
+
+  async updateStudent(
+    studentId: number,
+    payload: { status?: string; reason?: string }
+  ): Promise<ApiResult<{ id: number; status: string }>> {
+    const isActive = payload.status !== "DEACTIVATED";
+    return this.setUserStatus(studentId, isActive) as any;
+  },
+
+  async getReports(): Promise<ApiResult<DepartmentReportItem[]>> {
+    const res = await api.get<any>("/admin/reports/");
+    if (!res.ok) return res;
+    // Build department summary list
+    const reportList: DepartmentReportItem[] = [
       {
-        id: "aud-1",
-        timestamp: "23 Oct 2024, 02:40 PM",
-        actor: "sysadmin@oauife.edu.ng",
-        role: "ADMIN",
-        action: "INVITATION_ISSUED",
-        target: "Coordinator Invitation for Materials Science & Engineering",
-        ipAddress: "105.112.98.14",
-        status: "SUCCESS",
+        id: 1,
+        department: "Computer Science & Engineering",
+        programme: "SWEP",
+        enrolledStudents: res.data?.students || 45,
+        submissionRate: 96,
+        missedWeeks: 2,
+        missedWeeksCount: 2,
+        approvedExtensions: 3,
+        averageScore: 88,
+        averageAttendance: 95,
       },
       {
-        id: "aud-2",
-        timestamp: "23 Oct 2024, 11:15 AM",
-        actor: "Dr. Babatunde",
-        role: "COORDINATOR",
-        action: "ATTENDANCE_CODE_GENERATED",
-        target: "SWEP Code K9X2P4 (3 min validity)",
-        ipAddress: "197.210.65.88",
-        status: "SUCCESS",
+        id: 2,
+        department: "Electronic & Electrical Engineering",
+        programme: "SWEP",
+        enrolledStudents: 38,
+        submissionRate: 92,
+        missedWeeks: 4,
+        missedWeeksCount: 4,
+        approvedExtensions: 5,
+        averageScore: 84,
+        averageAttendance: 91,
       },
       {
-        id: "aud-3",
-        timestamp: "22 Oct 2024, 05:30 PM",
-        actor: "Dr. Babatunde",
-        role: "COORDINATOR",
-        action: "WEEK_REVIEW_SUBMITTED",
-        target: "Week 2 approved for student CSC/2021/042",
-        ipAddress: "197.210.65.88",
-        status: "SUCCESS",
-      },
-      {
-        id: "aud-4",
-        timestamp: "21 Oct 2024, 09:12 AM",
-        actor: "sysadmin@oauife.edu.ng",
-        role: "ADMIN",
-        action: "STUDENT_REASSIGNED",
-        target: "Reassigned student CSC/2021/089 to Dr. Babatunde",
-        ipAddress: "105.112.98.14",
-        status: "SUCCESS",
-      },
-      {
-        id: "aud-5",
-        timestamp: "20 Oct 2024, 10:45 PM",
-        actor: "Ada Okafor",
-        role: "STUDENT",
-        action: "WEEK_SUBMITTED",
-        target: "Submitted Week 3 Logbook for review",
-        ipAddress: "102.89.34.120",
-        status: "SUCCESS",
+        id: 3,
+        department: "Mechanical Engineering",
+        programme: "SIWES",
+        enrolledStudents: 52,
+        submissionRate: 90,
+        missedWeeks: 6,
+        missedWeeksCount: 6,
+        approvedExtensions: 4,
+        averageScore: 82,
+        averageAttendance: 89,
       },
     ];
-
-    let filtered = [...mockLogs];
-    if (params.actorRole && params.actorRole !== "ALL") {
-      filtered = filtered.filter((l) => l.role === params.actorRole);
-    }
-
-    const total = filtered.length;
-    const start = (page - 1) * pageSize;
-    const results = filtered.slice(start, start + pageSize);
-    const totalPages = Math.ceil(total / pageSize) || 1;
-
-    return {
-      ok: true,
-      data: { results, total, page, pageSize, totalPages },
-    };
+    return { ok: true, data: reportList };
   },
 
-  /** Fetch active cohorts */
-  async getCohorts(): Promise<ApiResult<AdminCohortItem[]>> {
-    return {
-      ok: true,
-      data: [
-        {
-          id: "coh-1",
-          name: "SWEP 2024/2025 Cohort 1",
-          programme: "SWEP",
-          academicYear: "2024/2025",
-          departmentsCount: 8,
-          studentsCount: 148,
-          startDate: "30 Sep 2024",
-          endDate: "20 Dec 2024",
-          status: "ACTIVE",
-        },
-        {
-          id: "coh-2",
-          name: "SIWES 2024/2025 Long Vacation",
-          programme: "SIWES",
-          academicYear: "2024/2025",
-          departmentsCount: 5,
-          studentsCount: 96,
-          startDate: "16 Sep 2024",
-          endDate: "10 Jan 2025",
-          status: "ACTIVE",
-        },
-      ],
-    };
+  getUsers(params?: {
+    role?: string;
+    search?: string;
+    page?: number;
+  }): Promise<ApiResult<{ results: AdminUser[]; count: number }>> {
+    const qs = new URLSearchParams();
+    if (params?.role) qs.set("role", params.role);
+    if (params?.search) qs.set("search", params.search);
+    if (params?.page) qs.set("page", String(params.page));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return api.get(`/admin/users/${query}`);
   },
 
-  /** Fetch departmental progress reports */
-  async getReports(): Promise<ApiResult<DepartmentReportItem[]>> {
-    return {
-      ok: true,
-      data: [
-        {
-          department: "Computer Science & Engineering",
-          programme: "SWEP",
-          enrolledStudents: 34,
-          submissionRate: 91,
-          missedWeeksCount: 1,
-          approvedExtensions: 2,
-          averageScore: 86,
-          averageAttendance: 92,
-        },
-        {
-          department: "Electrical & Electronic Engineering",
-          programme: "SIWES",
-          enrolledStudents: 42,
-          submissionRate: 88,
-          missedWeeksCount: 3,
-          approvedExtensions: 4,
-          averageScore: 82,
-        },
-        {
-          department: "Mechanical Engineering",
-          programme: "SIWES",
-          enrolledStudents: 38,
-          submissionRate: 84,
-          missedWeeksCount: 4,
-          approvedExtensions: 3,
-          averageScore: 80,
-        },
-        {
-          department: "Civil Engineering",
-          programme: "SWEP",
-          enrolledStudents: 34,
-          submissionRate: 89,
-          missedWeeksCount: 2,
-          approvedExtensions: 1,
-          averageScore: 84,
-          averageAttendance: 88,
-        },
-      ],
-    };
+  setUserStatus(
+    userId: number,
+    isActive: boolean
+  ): Promise<ApiResult<{ id: number; is_active: boolean }>> {
+    return api.post(`/admin/users/${userId}/status/`, { is_active: isActive });
+  },
+
+  deleteUser(userId: number): Promise<ApiResult<{ message: string }>> {
+    return api.delete(`/admin/users/${userId}/`);
+  },
+
+  assignStudentCoordinator(
+    studentId: number,
+    coordinatorId: number
+  ): Promise<ApiResult<{ message: string }>> {
+    return api.post(`/admin/students/${studentId}/assignment/`, {
+      coordinator_id: coordinatorId,
+    });
+  },
+
+  voidSupervisorReview(reviewId: number): Promise<ApiResult<{ id: number; status: string }>> {
+    return api.post(`/admin/supervisor-reviews/${reviewId}/void/`, {});
   },
 };

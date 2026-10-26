@@ -23,6 +23,19 @@ function formatFullDate(dateStr: string): string {
   }
 }
 
+function getAdjacentDate(dateStr: string, offsetDays: number): string {
+  try {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + offsetDays);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  } catch {
+    return dateStr;
+  }
+}
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 function SaveIndicator({ state }: { state: SaveState }) {
@@ -105,7 +118,7 @@ function FormField({
 
 export default function StudentDayPage({ params }: { params: Promise<{ date: string }> }) {
   const unwrappedParams = use(params);
-  const rawDate = unwrappedParams.date || "2024-10-23";
+  const rawDate = unwrappedParams.date;
 
   const [activities, setActivities] = useState("");
   const [skills, setSkills] = useState("");
@@ -159,6 +172,8 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
   }
 
   const isReadOnly = ["submitted", "reviewed"].includes(status);
+  const prevDate = getAdjacentDate(rawDate, -1);
+  const nextDate = getAdjacentDate(rawDate, 1);
 
   return (
     <div className="min-h-screen bg-[#F5F4EF] font-sans selection:bg-[#F04D23] selection:text-white text-[#141414] py-8 px-4 sm:px-6">
@@ -177,10 +192,10 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
           <div className="flex items-center gap-3">
             <SaveIndicator state={saveState} />
             <Link
-              href="/student/week/4"
+              href="/student"
               className="text-[11px] font-semibold text-[#141414] hover:underline"
             >
-              Week 4 overview &rarr;
+              Back to logbook &rarr;
             </Link>
           </div>
         </div>
@@ -190,7 +205,7 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-mono uppercase tracking-wider text-[#7A7973]">
-                Daily Log Entry &middot; Week 4
+                Daily Activity Record
               </span>
             </div>
             <h1 className="text-[1.25rem] sm:text-[1.35rem] font-bold tracking-[-0.025em] text-[#141414] mt-0.5">
@@ -219,7 +234,7 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
         {comment && (
           <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-[#141414] space-y-1">
             <p className="text-[11px] font-mono uppercase tracking-wider text-amber-900 font-semibold">
-              Coordinator Note
+              Coordinator Assessment Note
             </p>
             <p className="text-[12px] text-amber-950 leading-relaxed">
               {comment}
@@ -245,7 +260,7 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
               }}
               placeholder="Describe what tasks you carried out today in clear, concise detail…"
               required
-              minChars={50}
+              minChars={30}
               rows={4}
               readOnly={isReadOnly}
               hint="Include specific modules, systems, and deliverables worked on."
@@ -304,13 +319,13 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
             <div className="pt-4 border-t border-[#F0EFE9] flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Link
-                  href="/student/day/2024-10-22"
+                  href={`/student/day/${prevDate}`}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-[#D8D7CE] text-[11px] font-medium text-[#5A5954] hover:text-[#141414] hover:bg-white transition-colors"
                 >
                   <ChevronLeft className="size-3.5" /> Previous day
                 </Link>
                 <Link
-                  href="/student/day/2024-10-24"
+                  href={`/student/day/${nextDate}`}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-[#D8D7CE] text-[11px] font-medium text-[#5A5954] hover:text-[#141414] hover:bg-white transition-colors"
                 >
                   Next day <ChevronRight className="size-3.5" />

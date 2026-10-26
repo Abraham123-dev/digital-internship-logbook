@@ -40,13 +40,32 @@ export default function CoordinatorDashboardPage() {
     };
   } | null>(null);
 
+  const [attendanceSession, setAttendanceSession] = useState<{
+    id: number;
+    code: string;
+    seconds_left: number;
+    present_count: number;
+  } | null>(null);
+
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const res = await coordinatorApi.getDashboardData();
-      if (mounted && res.ok) {
-        setData(res.data);
+      const [dashRes, sessionRes] = await Promise.all([
+        coordinatorApi.getDashboardData(),
+        coordinatorApi.getAttendanceSession(),
+      ]);
+      if (!mounted) return;
+      if (dashRes.ok) {
+        setData(dashRes.data);
         setLoading(false);
+      }
+      if (sessionRes.ok && sessionRes.data && sessionRes.data.code && sessionRes.data.id > 0) {
+        setAttendanceSession({
+          id: sessionRes.data.id,
+          code: sessionRes.data.code,
+          seconds_left: sessionRes.data.secondsLeft ?? sessionRes.data.seconds_left ?? 0,
+          present_count: sessionRes.data.presentCount ?? sessionRes.data.present_count ?? 0,
+        });
       }
     }
     load();
@@ -55,35 +74,42 @@ export default function CoordinatorDashboardPage() {
     };
   }, []);
 
+  const subtitle = data?.cohortInfo
+    ? `${data.cohortInfo.programme} · ${data.cohortInfo.cycle}`
+    : undefined;
+
   return (
     <CoordinatorShell
       title="Coordinator Overview"
-      subtitle="SWEP 2024/2025 &middot; Department of Computer Science & Engineering"
+      subtitle={subtitle}
     >
       {loading || !data ? (
         <DashboardSkeleton />
       ) : (
         <div className="space-y-6">
-          
-          {/* Active Attendance Session Banner (SWEP) */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 p-4 rounded-2xl bg-white border border-[#E8E7E1] shadow-xs">
-            <div className="flex items-center gap-3">
-              <span className="size-2 rounded-full bg-[#F04D23] animate-pulse shrink-0" />
-              <div>
-                <p className="text-[13px] font-semibold text-[#141414]">Daily Attendance Session is Active</p>
-                <p className="text-[11px] text-[#7A7973]">
-                  Code <strong className="font-mono text-[#141414]">K9X2P4</strong> expires in 2 minutes &middot; 24 of 34 students checked in.
-                </p>
+
+          {/* Active Attendance Session Banner — only shown when a real session exists */}
+          {attendanceSession && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 p-4 rounded-2xl bg-white border border-[#E8E7E1] shadow-xs">
+              <div className="flex items-center gap-3">
+                <span className="size-2 rounded-full bg-[#F04D23] animate-pulse shrink-0" />
+                <div>
+                  <p className="text-[13px] font-semibold text-[#141414]">Daily Attendance Session is Active</p>
+                  <p className="text-[11px] text-[#7A7973]">
+                    Code <strong className="font-mono text-[#141414]">{attendanceSession.code}</strong>
+                    &nbsp;&middot;&nbsp;{attendanceSession.present_count} student{attendanceSession.present_count !== 1 ? "s" : ""} checked in
+                  </p>
+                </div>
               </div>
+              <Link
+                href="/coordinator/attendance"
+                className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#141414] text-white text-[11px] font-semibold hover:bg-[#282828] transition-colors"
+              >
+                <span>Manage session</span>
+                <ChevronRight className="size-3.5" />
+              </Link>
             </div>
-            <Link
-              href="/coordinator/attendance"
-              className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#141414] text-white text-[11px] font-semibold hover:bg-[#282828] transition-colors"
-            >
-              <span>Manage session</span>
-              <ChevronRight className="size-3.5" />
-            </Link>
-          </div>
+          )}
 
           {/* 4 Balanced Metrics */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

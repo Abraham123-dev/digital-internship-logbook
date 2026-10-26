@@ -4,19 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Calendar, CheckCircle2, X, AlertCircle,
-  Clock, ShieldCheck, Check
+  Clock, ShieldCheck, Check, Inbox
 } from "lucide-react";
 import { studentApi, type StudentAttendanceData } from "@/lib/api/student";
 
 type AttendanceStatus = "present" | "absent" | "excused";
-
-interface AttendanceRecord {
-  date:    string;
-  day:     string;
-  status:  AttendanceStatus;
-  reason?: string;
-  time?:   string;
-}
 
 const STATUS_MAP: Record<AttendanceStatus, { label: string; cls: string; icon: React.ReactNode }> = {
   present: { label: "Present", cls: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="size-3" /> },
@@ -89,7 +81,7 @@ function CodeDialog({
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-[#7A7973] hover:text-[#141414] transition-colors"
+            className="p-1 text-[#7A7973] hover:text-[#141414] transition-colors cursor-pointer"
           >
             <X className="size-4" />
           </button>
@@ -142,7 +134,7 @@ function CodeDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 py-2 rounded-full border border-[#D8D7CE] text-[12px] font-semibold text-[#5A5954] hover:text-[#141414] hover:bg-[#FAF9F5] transition-colors"
+                className="flex-1 py-2 rounded-full border border-[#D8D7CE] text-[12px] font-semibold text-[#5A5954] hover:text-[#141414] hover:bg-[#FAF9F5] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -165,20 +157,11 @@ export default function StudentAttendancePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [attendance, setAttendance] = useState<StudentAttendanceData>({
-    rate: 92,
-    attended: 18,
-    total: 20,
-    activeSession: true,
-    history: [
-      { date: "2024-10-23", dayName: "Wednesday", status: "present", time: "09:14 AM" },
-      { date: "2024-10-22", dayName: "Tuesday",   status: "present", time: "09:02 AM" },
-      { date: "2024-10-21", dayName: "Monday",    status: "present", time: "08:58 AM" },
-      { date: "2024-10-18", dayName: "Friday",    status: "present", time: "09:10 AM" },
-      { date: "2024-10-17", dayName: "Thursday",  status: "excused", note: "Approved medical leave" },
-      { date: "2024-10-16", dayName: "Wednesday", status: "present", time: "09:05 AM" },
-      { date: "2024-10-15", dayName: "Tuesday",   status: "present", time: "09:20 AM" },
-      { date: "2024-10-14", dayName: "Monday",    status: "absent",  note: "Unrecorded absence" },
-    ],
+    rate: 100,
+    attended: 0,
+    total: 0,
+    activeSession: false,
+    history: [],
   });
 
   async function loadAttendanceData() {
@@ -194,9 +177,9 @@ export default function StudentAttendancePage() {
     loadAttendanceData();
   }, []);
 
-  const presentCount = attendance.history.filter((r) => r.status === "present").length;
-  const totalCoded = attendance.history.length;
-  const pct = attendance.rate || Math.round((presentCount / (totalCoded || 1)) * 100);
+  const presentCount = attendance.attended;
+  const totalCoded = attendance.total;
+  const pct = attendance.rate;
 
   return (
     <div className="min-h-screen bg-[#F5F4EF] font-sans selection:bg-[#F04D23] selection:text-white text-[#141414] py-8 px-4 sm:px-6">
@@ -263,6 +246,16 @@ export default function StudentAttendancePage() {
 
           {loading ? (
             <div className="p-8 text-center text-[12px] text-[#7A7973]">Loading session records…</div>
+          ) : attendance.history.length === 0 ? (
+            <div className="p-10 text-center space-y-2">
+              <div className="size-10 rounded-full bg-[#F5F4EF] text-[#7A7973] mx-auto flex items-center justify-center">
+                <Inbox className="size-5" />
+              </div>
+              <p className="text-[13px] font-semibold text-[#141414]">No attendance sessions recorded yet</p>
+              <p className="text-[11.5px] text-[#7A7973] max-w-sm mx-auto">
+                When your SWEP coordinator opens a daily check-in session, enter the 6-character code using the &ldquo;Enter code&rdquo; button above.
+              </p>
+            </div>
           ) : (
             <div className="divide-y divide-[#F0EFE9]">
               {attendance.history.map((r) => {

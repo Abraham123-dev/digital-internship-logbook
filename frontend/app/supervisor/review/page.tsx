@@ -196,6 +196,7 @@ export default function SupervisorReviewPage({
 
               {batch.weeks.map((week) => {
                 const isOpen = expandedWeek === week.weekNumber;
+                const days = week.days ?? week.entries ?? [];
                 return (
                   <div
                     key={week.weekNumber}
@@ -213,7 +214,7 @@ export default function SupervisorReviewPage({
                         </span>
                         <div>
                           <p className="text-[13px] font-bold text-[#141414]">Week {week.weekNumber}</p>
-                          <p className="text-[10.5px] text-[#7A7973]">{week.dates} &middot; 5 working days recorded</p>
+                          <p className="text-[10.5px] text-[#7A7973]">{week.dates ?? `Week ${week.weekNumber}`} &middot; {days.length} working days recorded</p>
                         </div>
                       </div>
 
@@ -227,11 +228,11 @@ export default function SupervisorReviewPage({
                     {/* Week Daily Entries List */}
                     {isOpen && (
                       <div className="divide-y divide-[#F0EFE9] border-t border-[#F0EFE9] bg-[#FAF9F5]/40">
-                        {week.days.map((day) => (
+                        {days.map((day) => (
                           <div key={day.date} className="p-4 sm:p-5 space-y-2.5">
                             <div className="flex items-center justify-between">
                               <span className="text-[12.5px] font-bold text-[#141414]">
-                                {day.dayName} &middot; {day.date}
+                                {day.dayName ? `${day.dayName} · ` : ""}{day.date}
                               </span>
                               <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
                                 Completed
@@ -245,19 +246,23 @@ export default function SupervisorReviewPage({
                               </p>
                             </div>
 
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-mono uppercase text-[#7A7973]">Tools & Skills</p>
-                              <p className="text-[11.5px] text-[#5A5954] font-mono bg-white p-2.5 rounded-xl border border-[#E8E7E1]">
-                                {day.skills}
-                              </p>
-                            </div>
+                            {day.skills && (
+                              <div className="space-y-1">
+                                <p className="text-[10px] font-mono uppercase text-[#7A7973]">Tools & Skills</p>
+                                <p className="text-[11.5px] text-[#5A5954] font-mono bg-white p-2.5 rounded-xl border border-[#E8E7E1]">
+                                  {day.skills}
+                                </p>
+                              </div>
+                            )}
 
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-mono uppercase text-[#7A7973]">Student Reflection</p>
-                              <p className="text-[11.5px] text-[#5A5954] italic bg-white p-2.5 rounded-xl border border-[#E8E7E1]">
-                                &ldquo;{day.reflection}&rdquo;
-                              </p>
-                            </div>
+                            {(day.reflection || day.studentReview) && (
+                              <div className="space-y-1">
+                                <p className="text-[10px] font-mono uppercase text-[#7A7973]">Student Reflection</p>
+                                <p className="text-[11.5px] text-[#5A5954] italic bg-white p-2.5 rounded-xl border border-[#E8E7E1]">
+                                  &ldquo;{day.reflection || day.studentReview}&rdquo;
+                                </p>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

@@ -4,7 +4,8 @@ import { useState, use, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, ChevronRight, Lock, AlertCircle, Star,
-  CheckCircle2, Clock, Send, Calendar, HelpCircle, X
+  CheckCircle2, Clock, Send, Calendar, HelpCircle, X,
+  Inbox
 } from "lucide-react";
 import { studentApi, type DayStatus, type WeekStatus, type StudentDayData, type RequestExtensionPayload } from "@/lib/api/student";
 
@@ -47,14 +48,14 @@ function WeekStatusBadge({ status }: { status: WeekStatus }) {
 
 export default function StudentWeekPage({ params }: { params: Promise<{ n: string }> }) {
   const unwrappedParams = use(params);
-  const weekNum = parseInt(unwrappedParams.n, 10) || 4;
+  const weekNum = parseInt(unwrappedParams.n, 10) || 1;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [weekStatus, setWeekStatus] = useState<WeekStatus>("in_progress");
   const [days, setDays] = useState<StudentDayData[]>([]);
-  const [dates, setDates] = useState("21 – 25 October 2024");
+  const [dates, setDates] = useState("");
 
   // Extension Appeal Modal State
   const [appealModalOpen, setAppealModalOpen] = useState(false);
@@ -128,7 +129,7 @@ export default function StudentWeekPage({ params }: { params: Promise<{ n: strin
           </Link>
 
           <div className="flex items-center gap-2 text-[11px] text-[#7A7973]">
-            <span>SWEP 2024/2025</span>
+            <span>Logbook Cycle</span>
             <span>&middot;</span>
             <span className="font-semibold text-[#141414]">Week {weekNum}</span>
           </div>
@@ -144,7 +145,7 @@ export default function StudentWeekPage({ params }: { params: Promise<{ n: strin
               <WeekStatusBadge status={weekStatus} />
             </div>
             <p className="text-[11.5px] text-[#7A7973] mt-0.5">
-              {dates} &middot; Due Saturday at 11:59 PM
+              {dates ? `${dates} · Due Saturday at 11:59 PM` : "Weekly work log and reflections"}
             </p>
           </div>
 
@@ -164,7 +165,7 @@ export default function StudentWeekPage({ params }: { params: Promise<{ n: strin
             {/* Appeal extension link button */}
             <button
               onClick={() => setAppealModalOpen(true)}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#7A7973] hover:text-[#141414] border border-[#D8D7CE] px-2.5 py-1 rounded-full transition-colors"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#7A7973] hover:text-[#141414] border border-[#D8D7CE] px-2.5 py-1 rounded-full transition-colors cursor-pointer"
             >
               <Calendar className="size-3" />
               <span>Request extension</span>
@@ -194,6 +195,14 @@ export default function StudentWeekPage({ params }: { params: Promise<{ n: strin
 
           {loading ? (
             <div className="p-8 text-center text-[12px] text-[#7A7973]">Loading daily entries…</div>
+          ) : days.length === 0 ? (
+            <div className="p-10 text-center space-y-2">
+              <Inbox className="size-6 text-[#9A9990] mx-auto" />
+              <p className="text-[13px] font-semibold text-[#141414]">No daily entries found for this week</p>
+              <p className="text-[11.5px] text-[#7A7973] max-w-sm mx-auto">
+                Daily entries are automatically generated based on your cohort working days.
+              </p>
+            </div>
           ) : (
             <div className="divide-y divide-[#F0EFE9]">
               {days.map((day) => {
@@ -218,79 +227,98 @@ export default function StudentWeekPage({ params }: { params: Promise<{ n: strin
                             <span className="text-[10px] text-[#9A9990] font-mono">{day.date}</span>
                             <DayStatusBadge status={day.status} />
                             {day.rating != null && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                <Star className="size-2.5 fill-emerald-600 text-emerald-600" /> {day.rating}/5
+                              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                <Star className="size-2.5 fill-emerald-600 text-emerald-600" />
+                                {day.rating}/5
                               </span>
                             )}
                           </div>
 
                           {day.activities ? (
-                            <p className="text-[12px] text-[#5A5954] leading-relaxed line-clamp-2">
+                            <p className="text-[12px] text-[#5A5954] line-clamp-2 leading-relaxed">
                               {day.activities}
                             </p>
                           ) : (
-                            <p className="text-[11px] text-[#9A9990] italic">
-                              {isLocked ? "Entry opens on this date." : "No entry recorded for this day."}
+                            <p className="text-[11.5px] text-[#9A9990] italic">
+                              {day.status === "holiday" ? "Public holiday" : day.status === "future" ? "Upcoming work day" : "No entry written yet."}
                             </p>
+                          )}
+
+                          {day.skills && (
+                            <p className="text-[11px] font-mono text-[#7A7973] truncate">
+                              Skills: {day.skills}
+                            </p>
+                          )}
+
+                          {day.coordinatorComment && (
+                            <div className="p-2.5 rounded-lg bg-amber-50/70 border border-amber-200/60 text-[11px] text-amber-950 mt-1.5">
+                              <strong>Coordinator note:</strong> &ldquo;{day.coordinatorComment}&rdquo;
+                            </div>
                           )}
                         </div>
                       </div>
 
-                      {!isLocked && (
-                        <Link
-                          href={`/student/day/${day.date}`}
-                          className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full border border-[#D8D7CE] text-[11px] font-semibold text-[#141414] hover:bg-white transition-all shrink-0 self-start sm:self-center"
-                        >
-                          <span>{day.activities ? "Edit" : "Write entry"}</span>
-                          <ChevronRight className="size-3" />
-                        </Link>
-                      )}
+                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                        {isLocked ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-[#9A9990] px-3 py-1.5">
+                            <Lock className="size-3" /> Locked
+                          </span>
+                        ) : (
+                          <Link
+                            href={`/student/day/${day.date}`}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#D8D7CE] hover:border-[#141414] text-[11.5px] font-semibold text-[#141414] hover:bg-white transition-all shadow-2xs"
+                          >
+                            <span>{day.activities ? "Edit log" : "Write log"}</span>
+                            <ChevronRight className="size-3.5" />
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
+        </div>
 
-          {/* Submission Bar */}
-          <div className="px-5 py-3.5 bg-[#FAF9F5] border-t border-[#F0EFE9] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <p className="text-[11px] text-[#7A7973]">
+        {/* Submit Week Action Footer */}
+        <div className="bg-white rounded-2xl border border-[#E8E7E1] p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-[13px] font-bold text-[#141414]">Submit Week {weekNum}</h3>
+            <p className="text-[11px] text-[#7A7973] mt-0.5">
               {weekStatus === "submitted" || weekStatus === "reviewed"
-                ? `Week ${weekNum} has already been submitted.`
+                ? "This week has been submitted for assessment."
                 : isSubmissionReady
-                ? `All daily entries for Week ${weekNum} are complete and ready for submission.`
-                : `Complete all 5 days to submit this week.`}
+                ? "All 5 working days are completed. You can now submit this week."
+                : `Fill all 5 working days to unlock week submission (${filledCount}/5 completed).`}
             </p>
-
-            <button
-              onClick={handleSubmitWeek}
-              disabled={!isSubmissionReady || submitting}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-semibold transition-all ${
-                isSubmissionReady && !submitting
-                  ? "bg-[#141414] text-white hover:bg-[#282828] shadow-xs cursor-pointer"
-                  : "bg-[#E8E7E1] text-[#9A9990] cursor-not-allowed"
-              }`}
-            >
-              <Send className="size-3.5" />
-              <span>{submitting ? "Submitting…" : "Submit week"}</span>
-            </button>
           </div>
+
+          <button
+            onClick={handleSubmitWeek}
+            disabled={!isSubmissionReady || submitting}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[12px] font-semibold transition-all shadow-xs ${
+              isSubmissionReady && !submitting
+                ? "bg-[#141414] text-white hover:bg-[#282828] cursor-pointer"
+                : "bg-[#E8E7E1] text-[#9A9990] cursor-not-allowed"
+            }`}
+          >
+            <Send className="size-3.5" />
+            <span>{submitting ? "Submitting…" : `Submit Week ${weekNum}`}</span>
+          </button>
         </div>
 
       </div>
 
       {/* Extension Appeal Modal */}
       {appealModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-[#D8D7CE] shadow-xl max-w-[500px] w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-[#F0EFE9] pb-3">
-              <div>
-                <h3 className="text-[14px] font-bold text-[#141414]">Request Deadline Extension</h3>
-                <p className="text-[11px] text-[#7A7973]">Week {weekNum} Logbook Submission</p>
-              </div>
+        <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-[#E8E7E1] max-w-[460px] w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[14px] font-bold text-[#141414]">Request Deadline Extension</h3>
               <button
                 onClick={() => setAppealModalOpen(false)}
-                className="p-1 rounded-lg text-[#7A7973] hover:text-[#141414] hover:bg-[#F5F4EF]"
+                className="p-1 text-[#7A7973] hover:text-[#141414]"
               >
                 <X className="size-4" />
               </button>
