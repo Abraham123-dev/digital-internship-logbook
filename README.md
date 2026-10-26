@@ -77,6 +77,7 @@ Open `http://localhost:3000`.
 ## Project documentation
 
 - [Backend setup and development](backend/README.md)
+- [Technical report handoff](TECHNICAL_REPORT_HANDOFF.md)
 - [Frontend integration guide and API behavior](FRONTEND_GUIDE.md)
 - [Deployment checklist](DEPLOYMENT_TO_DO.md)
 - [Authentication execution plan](AUTH_EXECUTION_PLAN.md)

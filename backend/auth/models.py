@@ -105,6 +105,10 @@ class StudentProfile(models.Model):
         related_name="students",
     )
 
+    def __str__(self):
+        #to help define the field used to identify a particular profile table on django admin
+        return self.user.email
+
 
 class CoordinatorProfile(models.Model):
     id: int
@@ -113,6 +117,9 @@ class CoordinatorProfile(models.Model):
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
     programme = models.CharField(max_length=10, choices=Programme.choices)
     objects = models.Manager()
+
+    def __str__(self):
+        return self.user.email
 
 class CoordinatorInvitation(models.Model):
     class Status(models.TextChoices):
