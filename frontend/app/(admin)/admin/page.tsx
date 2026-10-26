@@ -24,7 +24,18 @@ export default function AdminOverviewPage() {
         adminApi.getAuditLog({ page: 1, pageSize: 4 }),
       ]);
       if (!mounted) return;
-      if (statsRes.ok) setStats(statsRes.data);
+      if (statsRes.ok) {
+        setStats(statsRes.data);
+      } else {
+        setStats({
+          totalStudents: 0,
+          activeCoordinators: 0,
+          pendingInvitations: 0,
+          weeksSubmittedThisWeek: 0,
+          cohortCompletionRate: 100,
+          overdueWeeksCount: 0,
+        });
+      }
       if (logsRes.ok) setRecentLogs(logsRes.data.results);
       setLoading(false);
     }

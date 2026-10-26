@@ -254,11 +254,14 @@ class LoginView(APIView):
         else:
             role_claim = "student"
         refresh["role"] = role_claim
+        access = refresh.access_token
+        access["role"] = role_claim
         return Response({
                 "message": "Login successful",
                 "username": user.first_name,
+                "role": role_claim,
                 "refresh": str(refresh),
-                "access": str(refresh.access_token),
+                "access": str(access),
             }, status=status.HTTP_200_OK)
 
 class LogoutView(APIView):
@@ -318,9 +321,12 @@ class RefreshView(APIView):
         else:
             role_claim = "student"
         new_refresh["role"] = role_claim
+        new_access = new_refresh.access_token
+        new_access["role"] = role_claim
         return Response({
             "server_time": current_time(),
-            "access": str(new_refresh.access_token),
+            "role": role_claim,
+            "access": str(new_access),
             "refresh": str(new_refresh),
         })
 
@@ -552,9 +558,12 @@ class AcceptInvitationView(APIView):
             return error("invitation_used", "Invitation has already been used.", 409)
         refresh = RefreshToken.for_user(user)
         refresh["role"] = "coordinator"
+        access = refresh.access_token
+        access["role"] = "coordinator"
         return Response({
             "server_time": current_time(),
             "user": user_response(user),
-            "access": str(refresh.access_token),
+            "role": "coordinator",
+            "access": str(access),
             "refresh": str(refresh),
         }, status=201)

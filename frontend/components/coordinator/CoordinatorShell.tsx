@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -30,6 +30,31 @@ export function CoordinatorShell({
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState<{ name: string; dept: string; prog: string } | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("logr_user_profile");
+      if (saved) {
+        try { return JSON.parse(saved); } catch {}
+      }
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    authApi.coordinatorProfile().then((res) => {
+      if (mounted && res.ok && res.data?.profile) {
+        const p = res.data.profile;
+        const name = `${p.account.first_name} ${p.account.last_name}`.trim();
+        const dept = p.department?.name || "Faculty of Technology";
+        const prog = p.programme || "SWEP";
+        const profObj = { name: name || "Coordinator", dept, prog };
+        setProfile(profObj);
+        localStorage.setItem("logr_user_profile", JSON.stringify(profObj));
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
 
   const navItems: NavItem[] = [
     { label: "Overview",            href: "/coordinator",             icon: <LayoutDashboard className="size-4" /> },
@@ -45,6 +70,12 @@ export function CoordinatorShell({
     authApi.logout?.();
     router.replace("/login");
   }
+
+  const initials = profile?.name
+    ? profile.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+    : "CO";
+  const displayName = profile?.name || "Coordinator";
+  const deptLabel = profile ? `${profile.prog} · ${profile.dept}` : "Institutional Coordinator";
 
   return (
     <div className="min-h-screen bg-[#F5F4EF] flex font-sans selection:bg-[#F04D23] selection:text-white text-[#141414]">
@@ -81,11 +112,11 @@ export function CoordinatorShell({
         <div className="p-4 border-b border-[#D8D7CE]">
           <div className="flex items-center gap-3 p-3 rounded-xl bg-white border border-[#E8E7E1]">
             <div className="size-8 rounded-full bg-[#141414] text-white flex items-center justify-center text-[11px] font-bold shrink-0">
-              TB
+              {initials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-semibold text-[#141414] truncate">Dr. Babatunde</p>
-              <p className="text-[10px] text-[#7A7973] truncate font-mono">SWEP Coordinator &middot; CSE</p>
+              <p className="text-[12px] font-semibold text-[#141414] truncate">{displayName}</p>
+              <p className="text-[10px] text-[#7A7973] truncate font-mono">{deptLabel}</p>
             </div>
           </div>
         </div>

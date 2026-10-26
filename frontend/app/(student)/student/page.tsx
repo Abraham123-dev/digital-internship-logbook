@@ -414,6 +414,36 @@ export default function StudentDashboardPage() {
       const res = await studentApi.getDashboard();
       if (res.ok && res.data) {
         setDashboard(res.data);
+      } else {
+        // Fallback to student profile so authenticated identity always displays
+        const profRes = await authApi.studentProfile();
+        if (profRes.ok && profRes.data?.profile) {
+          const p = profRes.data.profile;
+          setDashboard({
+            student: {
+              name: `${p.account.first_name} ${p.account.last_name}`.trim(),
+              matricNo: p.matric_no,
+              department: p.department?.name || "Faculty of Technology",
+              programme: p.programme,
+              institution: "Obafemi Awolowo University",
+              email: p.account.email,
+            },
+            isMatched: false,
+            cohort: null,
+            metrics: {
+              currentWeek: 1,
+              totalWeeks: 12,
+              completionPct: 0,
+              attendanceRate: 100,
+              daysLogged: 0,
+              totalTargetDays: 60,
+              runningScoreAvg: 0,
+              statusText: "Awaiting Session Cohort",
+            },
+            currentWeek: null,
+            weeks: [],
+          });
+        }
       }
       setLoading(false);
     }

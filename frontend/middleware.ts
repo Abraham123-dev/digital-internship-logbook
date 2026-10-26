@@ -26,8 +26,8 @@ function decodeJwtRole(token?: string): Role | null {
       .replace(/-/g, "+")
       .replace(/_/g, "/")
       .padEnd(segment.length + ((4 - (segment.length % 4)) % 4), "=");
-    const payload = JSON.parse(atob(base64)) as { role?: string };
-    const role = payload.role;
+    const payload = JSON.parse(atob(base64)) as { role?: string; user_role?: string };
+    const role = (payload.role ?? payload.user_role)?.toLowerCase();
     if (role === "student" || role === "coordinator" || role === "admin") return role as Role;
     return null;
   } catch {
@@ -39,16 +39,30 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (pathname.startsWith("/supervisor")) return NextResponse.next();
-  if (pathname === "/admin/login") return NextResponse.next();
 
   const cookieVal = req.cookies.get(SESSION_COOKIE)?.value;
-  const role = cookieVal ? decodeJwtRole(cookieVal) : null;
+  let role = cookieVal ? decodeJwtRole(cookieVal) : null;
+  if (!role) {
+    const roleCookie = req.cookies.get("logr_role")?.value?.toLowerCase();
+    if (roleCookie === "student" || roleCookie === "coordinator" || roleCookie === "admin") {
+      role = roleCookie as Role;
+    }
+  }
+
+  // If already authenticated and visiting admin login:
+  if (pathname === "/admin/login") {
+    if (role) {
+      return NextResponse.redirect(new URL(ROLE_HOME[role as Role], req.url));
+    }
+    return NextResponse.next();
+  }
 
   for (const { prefix, role: required } of PROTECTED) {
     if (!pathname.startsWith(prefix)) continue;
 
     if (!role) {
-      const url = new URL("/login", req.url);
+      const loginPath = pathname.startsWith("/admin") ? "/admin/login" : "/login";
+      const url = new URL(loginPath, req.url);
       url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     }

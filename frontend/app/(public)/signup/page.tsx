@@ -39,18 +39,65 @@ const inputCls = (hasError?: boolean) =>
 
 /* ── OTP step ─────────────────────────────────────────────── */
 function OtpStep({ email, onVerified }: { email: string; onVerified: () => void }) {
-  const [otp, setOtp] = useState("");
+  const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
   const [isPending, startTransition] = useTransition();
   const [isResending, startResend] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    inputRefs.current[0]?.focus();
+  }, []);
+
+  function handleInput(index: number, val: string) {
+    const char = val.replace(/\D/g, "").slice(-1);
+    const next = [...digits];
+    next[index] = char;
+    setDigits(next);
+    setError(null);
+    if (char && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  }
+
+  function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace") {
+      if (!digits[index] && index > 0) {
+        const next = [...digits];
+        next[index - 1] = "";
+        setDigits(next);
+        inputRefs.current[index - 1]?.focus();
+      }
+    } else if (e.key === "ArrowLeft" && index > 0) {
+      e.preventDefault();
+      inputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight" && index < 5) {
+      e.preventDefault();
+      inputRefs.current[index + 1]?.focus();
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const next = Array(6).fill("").map((_, i) => pasted[i] ?? "");
+    setDigits(next);
+    setError(null);
+    const nextFocusIdx = Math.min(pasted.length, 5);
+    inputRefs.current[nextFocusIdx]?.focus();
+  }
+
+  const otp = digits.join("");
 
   function handleVerify(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (otp.length !== 6) { setError("Enter the 6-digit code sent to your student email."); return; }
+    if (otp.length !== 6) {
+      setError("Please enter the full 6-digit code sent to your student email.");
+      return;
+    }
     startTransition(async () => {
       const res = await authApi.verifyOtp({ email, otp });
       if (!res.ok) {
@@ -75,27 +122,71 @@ function OtpStep({ email, onVerified }: { email: string; onVerified: () => void 
           We sent a 6-digit code to <strong className="text-[#141414]">{email}</strong>.
         </p>
       </div>
+
       <form onSubmit={handleVerify} noValidate className="flex flex-col gap-3">
-        <Field label="Verification code" id="otp" error={error ?? undefined}>
-          <input
-            ref={inputRef} id="otp" type="text" inputMode="numeric" maxLength={6}
-            value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-            placeholder="000000"
-            className={`w-full h-9.5 px-3 rounded-xl border bg-white text-[15px] font-bold tracking-[0.2em] text-[#141414] text-center placeholder:text-[#D8D7CE] outline-none transition-all focus:ring-2 focus:ring-[#F04D23]/20 focus:border-[#F04D23] ${error ? "border-red-400" : "border-[#D8D7CE]"}`}
-          />
-        </Field>
-        <button type="submit" disabled={isPending || otp.length !== 6}
-          className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm cursor-pointer">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
+            Verification code
+          </label>
+          <div className="grid grid-cols-6 gap-2 sm:gap-2.5 my-1" onPaste={handlePaste}>
+            {digits.map((digit, idx) => (
+              <input
+                key={idx}
+                ref={(el) => { inputRefs.current[idx] = el; }}
+                id={`otp-box-${idx}`}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="one-time-code"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handleInput(idx, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(idx, e)}
+                className={`size-11 sm:size-12 rounded-xl border text-center text-[18px] font-mono font-bold text-[#141414] outline-none transition-all focus:ring-2 focus:ring-[#F04D23]/20 focus:border-[#F04D23] bg-white shadow-xs ${
+                  error
+                    ? "border-red-400 bg-red-50/20 text-red-700"
+                    : digit
+                    ? "border-[#141414]"
+                    : "border-[#D8D7CE] hover:border-[#B0AFA9]"
+                }`}
+              />
+            ))}
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-200 mt-1">
+              <span className="mt-1 size-1.5 rounded-full bg-red-500 shrink-0" />
+              <p className="text-[11px] text-red-600 leading-snug">{error}</p>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={isPending || otp.length !== 6}
+          className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-2 shadow-sm cursor-pointer"
+        >
           {isPending ? "Verifying…" : "Confirm email"}
         </button>
       </form>
+
       <div className="mt-5 text-center">
         {resendMsg ? (
-          <p className="text-[12px] text-[#7A7973]">{resendMsg}</p>
+          <p className="text-[12px] text-emerald-700 font-medium">{resendMsg}</p>
         ) : (
-          <button onClick={() => { setError(null); setResendMsg(null); startResend(async () => { await authApi.resendOtp({ email }); setResendMsg("A new code was sent."); }); }}
-            disabled={isResending} className="text-[12px] font-semibold text-[#141414] hover:underline underline-offset-4 disabled:opacity-50 cursor-pointer">
-            {isResending ? "Resending…" : "Didn't get the code? Resend"}
+          <button
+            onClick={() => {
+              setError(null);
+              setResendMsg(null);
+              startResend(async () => {
+                await authApi.resendOtp({ email });
+                setResendMsg("A new 6-digit code was sent.");
+              });
+            }}
+            disabled={isResending}
+            className="text-[12px] font-semibold text-[#141414] hover:underline underline-offset-4 disabled:opacity-50 cursor-pointer"
+          >
+            {isResending ? "Resending code…" : "Didn't get the code? Resend"}
           </button>
         )}
       </div>

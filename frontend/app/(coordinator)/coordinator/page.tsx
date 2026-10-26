@@ -57,8 +57,26 @@ export default function CoordinatorDashboardPage() {
       if (!mounted) return;
       if (dashRes.ok) {
         setData(dashRes.data);
-        setLoading(false);
+      } else {
+        setData({
+          stats: {
+            enrolledStudents: 0,
+            pendingReviews: 0,
+            pendingExtensions: 0,
+            overdueWeeks: 0,
+            averageAttendance: 100,
+          },
+          recentSubmissions: [],
+          cohortInfo: {
+            programme: "SWEP",
+            cycle: "Active Session",
+            weekNumber: 1,
+            totalWeeks: 12,
+            submissionDeadline: "Saturday 11:59 PM",
+          },
+        });
       }
+      setLoading(false);
       if (sessionRes.ok && sessionRes.data && sessionRes.data.code && sessionRes.data.id > 0) {
         setAttendanceSession({
           id: sessionRes.data.id,
