@@ -53,14 +53,14 @@ export default function AdminLoginPage() {
               <div className="flex items-center gap-1.5 mb-2">
                 <span className="size-2 rounded-full bg-[#141414]" />
                 <span className="text-[10.5px] font-mono uppercase tracking-wider font-semibold text-[#141414]">
-                  Institutional Admin Console
+                  Admin Portal
                 </span>
               </div>
               <h1 className="text-[1.2rem] sm:text-[1.35rem] font-bold tracking-[-0.025em] text-[#141414] mb-1">
-                Superuser Access
+                Administrator Sign In
               </h1>
               <p className="text-[12px] sm:text-[12.5px] text-[#7A7973] leading-relaxed">
-                Faculty of Technology governance and audit portal.
+                Sign in to manage coordinators, configure cohorts, and oversee internship records for OAU.
               </p>
             </div>
 
@@ -123,7 +123,7 @@ export default function AdminLoginPage() {
                 type="submit" disabled={isPending}
                 className="w-full h-9.5 rounded-full bg-[#141414] text-white text-[12.5px] font-semibold hover:bg-[#282828] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-1 shadow-sm cursor-pointer"
               >
-                {isPending ? "Authenticating…" : "Sign in to Admin Console"}
+                {isPending ? "Signing in…" : "Sign In to Admin Portal"}
               </button>
             </form>
 
@@ -138,13 +138,12 @@ export default function AdminLoginPage() {
               </p>
               <p className="text-[10.5px] text-[#9A9990] flex items-center justify-center gap-1.5">
                 <Lock className="size-3 text-[#B0AFA9]" />
-                All administrative actions are cryptographically logged.
+                Authorized administrative access only.
               </p>
             </div>
           </div>
         </div>
       </div>
-
     </div>
   );
 }

@@ -115,6 +115,7 @@ export interface BackendLogbookHomeResponse {
   totalWeeks: number;
   dayNumber: number;
   totalDays: number;
+  runningScoreAvg?: number | null;
   previousWeeks: Array<{
     id: number;
     weekNumber: number;
@@ -130,6 +131,7 @@ export interface StudentDashboardData {
     name: string;
     matricNo: string;
     department: string;
+    faculty?: string;
     programme: ProgrammeType;
     institution: string;
     email: string;
@@ -308,23 +310,33 @@ export const studentApi = {
           account: { email: string; first_name: string; last_name: string; role: string };
           matric_no: string;
           department: string | { name: string };
+          faculty?: string;
           programme: ProgrammeType;
           email_verified: boolean;
         };
       }>("/me/student-profile/");
 
-      const profile = profileRes.ok ? profileRes.data.profile : null;
-      const deptName =
-        typeof profile?.department === "string"
-          ? profile.department
-          : profile?.department?.name || "Technology Faculty";
+      if (!profileRes.ok) {
+        return profileRes;
+      }
+      if (!profileRes.data?.profile) {
+        return {
+          ok: false,
+          status: 404,
+          message: "Failed to load student profile.",
+        };
+      }
 
-      const studentName = profile
-        ? `${profile.account.first_name} ${profile.account.last_name}`.trim()
-        : "Student";
-      const matricNo = profile?.matric_no || "CSC/2021/000";
-      const programme = (profile?.programme as ProgrammeType) || "SWEP";
-      const email = profile?.account.email || "";
+      const profile = profileRes.data.profile;
+      const deptName =
+        typeof profile.department === "string"
+          ? profile.department
+          : (profile.department as any)?.name || "—";
+
+      const studentName = `${profile.account.first_name || ""} ${profile.account.last_name || ""}`.trim() || profile.account.email.split("@")[0];
+      const matricNo = profile.matric_no || "—";
+      const programme = (profile.programme as ProgrammeType) || "SWEP";
+      const email = profile.account.email || "";
 
       // 2. Fetch Current Cohort
       const cohortRes = await api.get<CurrentCohortResponse>("/cohorts/current/");
@@ -429,7 +441,7 @@ export const studentApi = {
             attendanceRate,
             daysLogged,
             totalTargetDays,
-            runningScoreAvg: 4.5,
+            runningScoreAvg: logbookData?.runningScoreAvg ?? 0,
             statusText: isMatched
               ? `Week ${curWeekNo} of ${totalWeeks} in progress`
               : "Awaiting Department Cohort Launch",
@@ -645,7 +657,7 @@ export const studentApi = {
 
   /** Send review batch invitation to workplace supervisor */
   async sendSupervisorBatch(payload: SendSupervisorBatchPayload): Promise<ApiResult<{ message: string }>> {
-    const phone = payload.phone?.trim() || "+2348000000000";
+    const phone = payload.phone?.trim() || "+2348000000000" || "+2349000000000";
     const res = await api.post<{ message?: string }>(
       "/student/supervisor-reviews/",
       {

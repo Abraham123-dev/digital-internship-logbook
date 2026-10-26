@@ -12,6 +12,7 @@ export interface StudentSignupPayload {
   matric_no: string;
   email: string;
   department_id: number;
+  degree_programme_id?: number | null;
   programme: "SWEP" | "SIWES";
   password: string;
 }
@@ -31,32 +32,58 @@ export interface AcceptInvitePayload {
 }
 export interface AcceptInviteResponse { access: string; refresh: string }
 
-export interface Department { id: number; name: string }
+export interface DegreeProgramme {
+  id: number;
+  name: string;
+  faculty_id: number;
+  faculty_code?: string;
+}
+
+export interface Department {
+  id: number;
+  name: string;
+  faculty?: string | null;
+  faculty_code?: string | null;
+  faculty_id?: number | null;
+}
 
 export const DEFAULT_DEPTS: Department[] = [
-  { id: 1, name: "Computer Science & Engineering" },
-  { id: 2, name: "Electrical & Electronic Engineering" },
-  { id: 3, name: "Mechanical Engineering" },
-  { id: 4, name: "Civil Engineering" },
-  { id: 5, name: "Chemical Engineering" },
-  { id: 6, name: "Agricultural & Environmental Engineering" },
-  { id: 7, name: "Materials Science & Engineering" },
-  { id: 8, name: "Food Science & Technology" },
+  // Faculty of Computer Science & Engineering
+  { id: 12, name: "Software Engineering", faculty: "Faculty of Computer Science & Engineering", faculty_code: "FCSE", faculty_id: 1 },
+  { id: 11, name: "Computer Engineering", faculty: "Faculty of Computer Science & Engineering", faculty_code: "FCSE", faculty_id: 1 },
+  { id: 9,  name: "Computer Science with Mathematics", faculty: "Faculty of Computer Science & Engineering", faculty_code: "FCSE", faculty_id: 1 },
+  { id: 10, name: "Computer Science with Economics", faculty: "Faculty of Computer Science & Engineering", faculty_code: "FCSE", faculty_id: 1 },
+  { id: 13, name: "Information & Communication Technology", faculty: "Faculty of Computer Science & Engineering", faculty_code: "FCSE", faculty_id: 1 },
+  { id: 14, name: "Information Science", faculty: "Faculty of Computer Science & Engineering", faculty_code: "FCSE", faculty_id: 1 },
+  { id: 1,  name: "Computer Science & Engineering", faculty: "Faculty of Computer Science & Engineering", faculty_code: "FCSE", faculty_id: 1 },
+
+  // Faculty of Technology
+  { id: 2, name: "Electrical & Electronic Engineering", faculty: "Faculty of Technology", faculty_code: "FTECH", faculty_id: 2 },
+  { id: 3, name: "Mechanical Engineering", faculty: "Faculty of Technology", faculty_code: "FTECH", faculty_id: 2 },
+  { id: 4, name: "Civil Engineering", faculty: "Faculty of Technology", faculty_code: "FTECH", faculty_id: 2 },
+  { id: 5, name: "Chemical Engineering", faculty: "Faculty of Technology", faculty_code: "FTECH", faculty_id: 2 },
+  { id: 6, name: "Agricultural & Environmental Engineering", faculty: "Faculty of Technology", faculty_code: "FTECH", faculty_id: 2 },
+  { id: 7, name: "Materials Science & Engineering", faculty: "Faculty of Technology", faculty_code: "FTECH", faculty_id: 2 },
+  { id: 8, name: "Food Science & Technology", faculty: "Faculty of Technology", faculty_code: "FTECH", faculty_id: 2 },
 ];
 
 export interface StudentProfileData {
   account: { id: number; email: string; first_name: string; last_name: string };
   matric_no: string;
-  department: { id: number; name: string };
+  department: string | { id?: number; name: string };
+  faculty?: string;
   programme: "SWEP" | "SIWES";
   email_verified: boolean;
 }
 
 export interface CoordinatorProfileData {
   account: { id: number; email: string; first_name: string; last_name: string };
-  department: { id: number; name: string };
+  department: string | { id?: number; name: string };
+  faculty?: string;
   programme: "SWEP" | "SIWES";
   phone: string;
+  enrolled_students?: number;
+  active_cohort?: string | null;
 }
 
 export interface InvitationItem {
@@ -88,6 +115,7 @@ const P = {
   validateInvite:     "/invitations/validate/",
   acceptInvite:       "/invitations/accept/",
   departments:        "/departments/",
+  degreeProgrammes:   "/degree-programmes/",
   studentProfile:     "/me/student-profile/",
   coordinatorProfile: "/me/coordinator-profile/",
   changePassword:     "/me/password/",
@@ -163,14 +191,30 @@ export const authApi = {
   /** Fetch department list. Falls back gracefully to default faculty departments if backend route is not mounted yet. */
   departments: async (): Promise<ApiResult<Department[]>> => {
     try {
-      const res = await api.get<Department[]>(P.departments, { public: true });
-      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
-        return res;
+      const res = await api.get<{ results?: Department[] } | Department[]>(P.departments, { public: true });
+      if (res.ok && res.data) {
+        const list = Array.isArray(res.data) ? res.data : (res.data.results ?? []);
+        if (list.length > 0) return { ok: true, data: list };
       }
     } catch {
       // Graceful fallback
     }
     return { ok: true, data: DEFAULT_DEPTS };
+  },
+
+  /** Fetch degree programmes, optionally filtered by department. */
+  degreeProgrammes: async (departmentId?: number): Promise<ApiResult<DegreeProgramme[]>> => {
+    try {
+      const url = departmentId ? `${P.degreeProgrammes}?department_id=${departmentId}` : P.degreeProgrammes;
+      const res = await api.get<{ results?: DegreeProgramme[] } | DegreeProgramme[]>(url, { public: true });
+      if (res.ok && res.data) {
+        const list = Array.isArray(res.data) ? res.data : (res.data.results ?? []);
+        return { ok: true, data: list };
+      }
+    } catch {
+      // Return empty list
+    }
+    return { ok: true, data: [] };
   },
 
   /** Alias for departments() for backward compatibility */

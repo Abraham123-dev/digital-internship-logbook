@@ -13,8 +13,8 @@ import { coordinatorApi, type AttendanceSession } from "@/lib/api/coordinator";
 export default function CoordinatorAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<AttendanceSession | null>(null);
-  const [timeLeft, setTimeLeft] = useState<number>(120); // seconds
-  const [codeActive, setCodeActive] = useState(true);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [codeActive, setCodeActive] = useState(false);
 
   // Override modal
   const [overrideModal, setOverrideModal] = useState<{
@@ -28,10 +28,26 @@ export default function CoordinatorAttendancePage() {
     let mounted = true;
     async function load() {
       const res = await coordinatorApi.getAttendanceSession();
-      if (mounted && res.ok) {
+      if (!mounted) return;
+      if (res.ok && res.data) {
         setSession(res.data);
-        setLoading(false);
+        const isActive = Boolean(res.data.active && res.data.code && (res.data.secondsLeft ?? 0) > 0);
+        setCodeActive(isActive);
+        setTimeLeft(res.data.secondsLeft ?? 0);
+      } else {
+        setSession({
+          id: 0,
+          code: "",
+          active: false,
+          secondsLeft: 0,
+          presentCount: 0,
+          totalStudents: 0,
+          records: [],
+        });
+        setCodeActive(false);
+        setTimeLeft(0);
       }
+      setLoading(false);
     }
     load();
     return () => {

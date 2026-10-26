@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db import models
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -74,18 +75,32 @@ class LogrAccountSerializer(serializers.ModelSerializer):
 class StudentProfileSerializer(serializers.ModelSerializer):
     account = LogrAccountSerializer(source="user", read_only=True)
     department = serializers.CharField(source="department.name", read_only=True)
+    faculty = serializers.CharField(source="department.faculty.name", read_only=True, default=None)
 
     class Meta:
         model = StudentProfile
-        fields = ["account", "matric_no", "department", "programme", "email_verified"]
+        fields = ["account", "matric_no", "department", "faculty", "programme", "email_verified"]
 
 class CoordinatorProfileSerializer(serializers.ModelSerializer):
     account = LogrAccountSerializer(source="user", read_only=True)
     department = serializers.CharField(source="department.name", read_only=True)
+    faculty = serializers.CharField(source="department.faculty.name", read_only=True, default=None)
+    enrolled_students = serializers.SerializerMethodField()
+    active_cohort = serializers.SerializerMethodField()
 
     class Meta:
         model = CoordinatorProfile
-        fields = ["account", "department", "programme", "phone"]
+        fields = ["account", "department", "faculty", "programme", "phone", "enrolled_students", "active_cohort"]
+
+    def get_enrolled_students(self, obj):
+        return StudentProfile.objects.filter(
+            models.Q(coordinator=obj) | models.Q(cohort__coordinator=obj)
+        ).distinct().count()
+
+    def get_active_cohort(self, obj):
+        from backend.management.models import Cohort
+        cohort = Cohort.objects.filter(coordinator=obj).order_by("-start_date").first()
+        return cohort.session if cohort else None
 
 class EmailSerializer(serializers.Serializer):
     email = serializers.EmailField()

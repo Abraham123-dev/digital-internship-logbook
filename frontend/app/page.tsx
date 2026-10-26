@@ -407,7 +407,7 @@ export default function Home() {
           </div>
 
           <div className="pt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[10px] sm:text-[11px] text-white/30 font-mono">
-            <span>Obafemi Awolowo University · Faculty of Technology</span>
+            <span>Obafemi Awolowo University · Technology &amp; Computing Faculties</span>
             <span>SWEP &amp; SIWES · {new Date().getFullYear()}</span>
           </div>
 

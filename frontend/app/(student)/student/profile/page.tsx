@@ -80,7 +80,7 @@ export default function StudentProfilePage() {
     name: "Student",
     matricNo: "—",
     programme: "SWEP",
-    department: "Faculty of Technology",
+    department: "—",
     email: "—",
     coordinator: "Assigned upon session launch",
     session: "Pending announcement",
@@ -96,7 +96,7 @@ export default function StudentProfilePage() {
 
         if (profRes.ok && profRes.data?.profile) {
           const p = profRes.data.profile;
-          const dept = typeof p.department === "string" ? p.department : (p.department as any)?.name || "Faculty of Technology";
+          const dept = typeof p.department === "string" ? p.department : (p.department as any)?.name || "Department pending";
           const coordinator = cohortRes.ok && cohortRes.data?.cohort?.coordinator
             ? cohortRes.data.cohort.coordinator
             : "Assigned upon session launch";

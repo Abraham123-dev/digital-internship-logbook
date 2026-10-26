@@ -16,11 +16,15 @@ export interface AdminUser {
     programme: string;
     department_name: string;
     cohort_id?: number;
+    weeks_submitted?: number;
+    total_weeks?: number;
+    running_score_avg?: number;
   };
   coordinator_profile?: {
     staff_id?: string;
     department_name: string;
     programme: string;
+    enrolled_students_count?: number;
   };
 }
 
@@ -46,6 +50,8 @@ export interface AdminStats {
   weeksSubmittedThisWeek: number;
   cohortCompletionRate: number;
   overdueWeeksCount: number;
+  pendingStudents?: number;
+  departments?: number;
 }
 
 export interface AdminCohortItem {
@@ -62,6 +68,36 @@ export interface AdminCohortItem {
   end_date?: string;
   total_weeks?: number;
   status: string;
+  coordinator?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+}
+
+export interface CreateCohortPayload {
+  department_id: number;
+  coordinator_id: number;
+  session: string;
+  programme: "SWEP" | "SIWES";
+  start_date: string;
+  end_date: string;
+  total_weeks?: number;
+  working_days?: number[];
+  deadline_weekday?: number;
+  deadline_time?: string;
+  min_filled_chars?: number;
+  request_window_days?: number;
+}
+
+export interface PendingStudentItem {
+  id: number;
+  name: string;
+  email: string;
+  matric_no: string;
+  department: string;
+  degree_programme?: string | null;
+  programme: string;
 }
 
 export interface AdminCoordinatorItem {
@@ -144,8 +180,10 @@ export const adminApi = {
       activeCoordinators: d.coordinators ?? d.total_coordinators ?? 0,
       pendingInvitations: d.supervisor_reviews_waiting ?? d.pending_invitations ?? 0,
       weeksSubmittedThisWeek: d.weeks_waiting_for_review ?? d.weeks_submitted_today ?? 0,
-      cohortCompletionRate: 94,
-      overdueWeeksCount: 0,
+      cohortCompletionRate: d.cohort_completion_rate ?? d.submission_rate ?? 0,
+      overdueWeeksCount: d.overdue_weeks ?? d.overdue_weeks_count ?? 0,
+      pendingStudents: d.pending_students ?? 0,
+      departments: d.departments ?? d.active_departments ?? 0,
     };
     return { ok: true, data: stats };
   },
@@ -171,13 +209,13 @@ export const adminApi = {
       id: item.id,
       timestamp: item.created_at || new Date().toISOString(),
       action: item.action || "SYSTEM_EVENT",
-      actor: item.actor || "admin@oauife.edu.ng",
+      actor: item.actor || "—",
       actor_email: item.actor,
       role: item.actor?.includes("student") ? "STUDENT" : item.actor?.includes("coord") ? "COORDINATOR" : "ADMIN",
-      target: item.target_type ? `${item.target_type} #${item.target_id}` : "System Resource",
+      target: item.target_type ? `${item.target_type} #${item.target_id}` : "System",
       target_type: item.target_type,
       target_id: item.target_id,
-      ipAddress: item.ip_address || "127.0.0.1",
+      ipAddress: item.ip_address || "—",
       status: "Recorded",
       details: item.details || {},
     }));
@@ -199,20 +237,29 @@ export const adminApi = {
     const rawList = Array.isArray(res.data) ? res.data : (res.data?.results || []);
     const mapped: AdminCohortItem[] = rawList.map((c: any) => ({
       id: c.id,
-      name: `${c.department || "Engineering"} - ${c.programme}`,
-      academicYear: c.session || "2024/2025",
+      name: `${c.department || c.department_name || "—"} — ${c.programme}`,
+      academicYear: c.session || "",
       session: c.session,
       programme: c.programme || "SWEP",
       departmentsCount: 1,
-      studentsCount: c.studentsCount || 45,
+      studentsCount: c.students_count ?? c.studentsCount ?? 0,
       startDate: c.start_date || "",
       endDate: c.end_date || "",
       start_date: c.start_date,
       end_date: c.end_date,
-      total_weeks: c.total_weeks || 12,
-      status: c.status || "ACTIVE",
+      total_weeks: c.total_weeks ?? undefined,
+      status: c.status || "UPCOMING",
+      coordinator: c.coordinator,
     }));
     return { ok: true, data: mapped };
+  },
+
+  createCohort(payload: CreateCohortPayload): Promise<ApiResult<AdminCohortItem>> {
+    return api.post("/admin/cohorts/", payload);
+  },
+
+  getPendingStudents(): Promise<ApiResult<{ count: number; results: PendingStudentItem[] }>> {
+    return api.get("/admin/pending-students/");
   },
 
   async getCoordinators(params?: {
@@ -227,11 +274,11 @@ export const adminApi = {
       id: u.id,
       name: `${u.first_name} ${u.last_name}`.trim() || u.email.split("@")[0],
       email: u.email,
-      department: u.coordinator_profile?.department_name || "Computer Science",
-      programme: u.coordinator_profile?.programme || "SWEP",
-      staffId: u.coordinator_profile?.staff_id || `STF-${u.id}`,
-      assignedStudents: 45,
-      enrolledStudentsCount: 45,
+      department: u.coordinator_profile?.department_name || "—",
+      programme: u.coordinator_profile?.programme || "—",
+      staffId: u.coordinator_profile?.staff_id || "—",
+      assignedStudents: u.coordinator_profile?.enrolled_students_count ?? 0,
+      enrolledStudentsCount: u.coordinator_profile?.enrolled_students_count ?? 0,
       status: u.is_active ? "ACTIVE" : "INACTIVE",
       joinedDate: u.date_joined || new Date().toISOString().slice(0, 10),
       joinedAt: u.date_joined || new Date().toISOString().slice(0, 10),
@@ -259,15 +306,15 @@ export const adminApi = {
     const mapped: AdminStudentItem[] = users.map((u) => ({
       id: u.id,
       name: `${u.first_name} ${u.last_name}`.trim() || u.email.split("@")[0],
-      matricNo: u.student_profile?.matric_no || "CSC/2021/001",
+      matricNo: u.student_profile?.matric_no || "—",
       email: u.email,
-      department: u.student_profile?.department_name || "Computer Science",
-      programme: u.student_profile?.programme || "SWEP",
-      coordinatorName: "Assigned Coordinator",
+      department: u.student_profile?.department_name || "—",
+      programme: u.student_profile?.programme || "—",
+      coordinatorName: undefined,
       status: u.is_active ? "ACTIVE" : "DEACTIVATED",
-      weeksSubmitted: 6,
-      totalWeeks: 12,
-      runningScoreAvg: 88,
+      weeksSubmitted: u.student_profile?.weeks_submitted ?? 0,
+      totalWeeks: u.student_profile?.total_weeks ?? 0,
+      runningScoreAvg: u.student_profile?.running_score_avg ?? 0,
       joinedDate: u.date_joined || new Date().toISOString().slice(0, 10),
     }));
     return {
@@ -291,45 +338,24 @@ export const adminApi = {
   async getReports(): Promise<ApiResult<DepartmentReportItem[]>> {
     const res = await api.get<any>("/admin/reports/");
     if (!res.ok) return res;
-    // Build department summary list
-    const reportList: DepartmentReportItem[] = [
-      {
-        id: 1,
-        department: "Computer Science & Engineering",
-        programme: "SWEP",
-        enrolledStudents: res.data?.students || 45,
-        submissionRate: 96,
-        missedWeeks: 2,
-        missedWeeksCount: 2,
-        approvedExtensions: 3,
-        averageScore: 88,
-        averageAttendance: 95,
-      },
-      {
-        id: 2,
-        department: "Electronic & Electrical Engineering",
-        programme: "SWEP",
-        enrolledStudents: 38,
-        submissionRate: 92,
-        missedWeeks: 4,
-        missedWeeksCount: 4,
-        approvedExtensions: 5,
-        averageScore: 84,
-        averageAttendance: 91,
-      },
-      {
-        id: 3,
-        department: "Mechanical Engineering",
-        programme: "SIWES",
-        enrolledStudents: 52,
-        submissionRate: 90,
-        missedWeeks: 6,
-        missedWeeksCount: 6,
-        approvedExtensions: 4,
-        averageScore: 82,
-        averageAttendance: 89,
-      },
-    ];
+    // Backend may return a list or a paginated object
+    const rawList: any[] = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.results)
+      ? res.data.results
+      : [];
+    const reportList: DepartmentReportItem[] = rawList.map((r: any, idx: number) => ({
+      id: r.id ?? idx + 1,
+      department: r.department ?? r.department_name ?? "—",
+      programme: r.programme ?? "SWEP",
+      enrolledStudents: r.enrolled_students ?? r.enrolledStudents ?? 0,
+      submissionRate: r.submission_rate ?? r.submissionRate ?? 0,
+      missedWeeks: r.missed_weeks ?? r.missedWeeks ?? 0,
+      missedWeeksCount: r.missed_weeks ?? r.missedWeeksCount ?? 0,
+      approvedExtensions: r.approved_extensions ?? r.approvedExtensions ?? 0,
+      averageScore: r.average_score ?? r.averageScore ?? 0,
+      averageAttendance: r.average_attendance ?? r.averageAttendance ?? undefined,
+    }));
     return { ok: true, data: reportList };
   },
 

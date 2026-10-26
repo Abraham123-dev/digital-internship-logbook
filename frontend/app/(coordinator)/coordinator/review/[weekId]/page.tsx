@@ -36,24 +36,30 @@ export default function CoordinatorReviewPage({
   const [submitting, setSubmitting] = useState(false);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [returnReason, setReturnReason] = useState("");
-  const [returnDeadline, setReturnDeadline] = useState("Tuesday, 29 Oct at 11:59 PM");
+  const [returnDeadline, setReturnDeadline] = useState(() => {
+    const d = new Date(Date.now() + 48 * 3600 * 1000);
+    return `${d.toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "short" })} at 11:59 PM`;
+  });
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
+      setLoading(true);
       const res = await coordinatorApi.getSubmissionDetail(weekId);
-      if (mounted && res.ok) {
-        setSubmission(res.data);
-        // Pre-populate existing ratings if present
-        const initRatings: Record<number, number> = {};
-        const initComments: Record<number, string> = {};
-        res.data.days.forEach((d, idx) => {
-          if (d.rating) initRatings[idx] = d.rating;
-          if (d.comment) initComments[idx] = d.comment;
-        });
-        setRatings(initRatings);
-        setComments(initComments);
+      if (mounted) {
+        if (res.ok && res.data) {
+          setSubmission(res.data);
+          // Pre-populate existing ratings if present
+          const initRatings: Record<number, number> = {};
+          const initComments: Record<number, string> = {};
+          res.data.days.forEach((d, idx) => {
+            if (d.rating) initRatings[idx] = d.rating;
+            if (d.comment) initComments[idx] = d.comment;
+          });
+          setRatings(initRatings);
+          setComments(initComments);
+        }
         setLoading(false);
       }
     }

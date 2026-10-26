@@ -45,8 +45,8 @@ export function CoordinatorShell({
     authApi.coordinatorProfile().then((res) => {
       if (mounted && res.ok && res.data?.profile) {
         const p = res.data.profile;
-        const name = `${p.account.first_name} ${p.account.last_name}`.trim();
-        const dept = p.department?.name || "Faculty of Technology";
+        const name = `${p.account.first_name || ""} ${p.account.last_name || ""}`.trim();
+        const dept = (typeof p.department === "string" ? p.department : p.department?.name) || "—";
         const prog = p.programme || "SWEP";
         const profObj = { name: name || "Coordinator", dept, prog };
         setProfile(profObj);
@@ -58,9 +58,9 @@ export function CoordinatorShell({
 
   const navItems: NavItem[] = [
     { label: "Overview",            href: "/coordinator",             icon: <LayoutDashboard className="size-4" /> },
-    { label: "Weekly Reviews",      href: "/coordinator/review/sub-101", icon: <CheckSquare className="size-4" />, badge: 3 },
+    { label: "Weekly Reviews",      href: "/coordinator/students?filter=needs_review", icon: <CheckSquare className="size-4" /> },
     { label: "Students & Cohort",   href: "/coordinator/students",    icon: <Users className="size-4" /> },
-    { label: "Extension Requests",  href: "/coordinator/extensions",  icon: <Clock className="size-4" />, badge: 1 },
+    { label: "Extension Requests",  href: "/coordinator/extensions",  icon: <Clock className="size-4" /> },
     { label: "SWEP Attendance",     href: "/coordinator/attendance",  icon: <Calendar className="size-4" /> },
     { label: "Cohort Settings",     href: "/coordinator/cohort",      icon: <Settings className="size-4" /> },
     { label: "Profile",             href: "/coordinator/profile",     icon: <User className="size-4" /> },

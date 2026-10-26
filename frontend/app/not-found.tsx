@@ -48,7 +48,7 @@ export default function NotFound() {
       </main>
 
       <footer className="text-center text-[11px] text-[#9A9990] py-4">
-        Obafemi Awolowo University &middot; Faculty of Technology &middot; SWEP & SIWES
+        Obafemi Awolowo University &middot; Technology &amp; Computing Faculties &middot; SWEP &amp; SIWES
       </footer>
     </div>
   );

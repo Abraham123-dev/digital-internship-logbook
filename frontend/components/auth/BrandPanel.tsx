@@ -68,7 +68,7 @@ const COPY: Record<BrandPanelProps["variant"], {
       "Coordinator feedback & grading",
       "SWEP attendance · SIWES supervision",
     ],
-    footer: "Obafemi Awolowo University · Faculty of Technology",
+    footer: "Obafemi Awolowo University · Technology & Computing Faculties",
   },
   signup: {
     eyebrow: "Student Registration",
@@ -79,21 +79,21 @@ const COPY: Record<BrandPanelProps["variant"], {
       "SIWES — Industrial placement scheme",
       "Coordinator-verified logbook records",
     ],
-    footer: "Obafemi Awolowo University · Faculty of Technology",
+    footer: "Obafemi Awolowo University · Technology & Computing Faculties",
   },
   admin: {
-    eyebrow: "Admin Console",
-    headline: <>Logr<br />administration<br />panel</>,
-    body: "Create coordinator accounts, assign departments, manage cohort dates, and view audit records for the OAU internship system.",
+    eyebrow: "Institutional Admin",
+    headline: <>Manage your<br />internship<br />portal</>,
+    body: "Oversee coordinators, academic cohorts, and student logbooks across all engineering and computing departments.",
     bullets: [
-      "Invite coordinators by department",
-      "Set cohort dates and programme windows",
-      "View all students, records, and audit trail",
+      "Invite and assign department coordinators",
+      "Set up internship sessions and cohorts",
+      "Track student progress and system activity",
     ],
     footer: (
-      <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-white/25">
+      <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-white/40">
         <Lock className="size-3" />
-        Every admin action is logged and timestamped.
+        Secure administrative access.
       </span>
     ),
   },
@@ -106,7 +106,7 @@ const COPY: Record<BrandPanelProps["variant"], {
       "Generate daily SWEP attendance codes",
       "Provide structured feedback and grades",
     ],
-    footer: "Obafemi Awolowo University · Faculty of Technology",
+    footer: "Obafemi Awolowo University · Technology & Computing Faculties",
   },
 };
 

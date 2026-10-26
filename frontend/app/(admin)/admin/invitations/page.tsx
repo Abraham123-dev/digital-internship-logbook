@@ -39,33 +39,7 @@ export default function AdminInvitationsPage() {
         : (invRes.data?.results ?? []);
       setInvitations(items);
     } else {
-      // Mock / fallback invitations if unauthenticated or endpoint is still starting
-      setInvitations([
-        {
-          id: 1,
-          email: "falade.m@oauife.edu.ng",
-          department: "Computer Science & Engineering",
-          programme: "SWEP",
-          status: "ACCEPTED",
-          expires_at: new Date(Date.now() + 86400000).toISOString(),
-        },
-        {
-          id: 2,
-          email: "adeyemi.o@oauife.edu.ng",
-          department: "Electrical & Electronic Engineering",
-          programme: "SIWES",
-          status: "PENDING",
-          expires_at: new Date(Date.now() + 172800000).toISOString(),
-        },
-        {
-          id: 3,
-          email: "olawale.k@oauife.edu.ng",
-          department: "Mechanical Engineering",
-          programme: "SWEP",
-          status: "EXPIRED",
-          expires_at: new Date(Date.now() - 86400000).toISOString(),
-        },
-      ]);
+      setInvitations([]);
     }
 
     if (deptsRes.ok && Array.isArray(deptsRes.data) && deptsRes.data.length > 0) {

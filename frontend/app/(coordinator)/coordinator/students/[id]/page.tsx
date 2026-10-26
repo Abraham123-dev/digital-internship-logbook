@@ -33,10 +33,11 @@ export default function CoordinatorStudentDetailPage({
     let mounted = true;
     async function load() {
       const res = await coordinatorApi.getStudentDetail(studentId);
-      if (mounted && res.ok) {
+      if (!mounted) return;
+      if (res.ok) {
         setData(res.data);
-        setLoading(false);
       }
+      setLoading(false);
     }
     load();
     return () => {

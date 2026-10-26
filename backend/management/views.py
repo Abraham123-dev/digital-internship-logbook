@@ -18,7 +18,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from backend.auth.email_service import EmailDeliveryError, send_email
-from backend.auth.models import CoordinatorProfile, LogrAccount, Programme, StudentProfile
+from backend.auth.models import CoordinatorProfile, Department, DegreeProgramme, LogrAccount, Programme, StudentProfile
 from .models import (
     AttendanceRecord,
     AttendanceSession,
@@ -302,24 +302,6 @@ class CoordinatorCohortView(APIView):
         cohorts = Cohort.objects.filter(coordinator=coordinator).order_by("-start_date")
         return Response({"results": CohortSerializer(cohorts, many=True).data})
 
-    def post(self, request):
-        coordinator = get_coordinator(request.user)
-        serializer = CohortSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        if serializer.validated_data["programme"] != coordinator.programme:
-            return api_error("programme_mismatch", "You can only create a cohort for your assigned programme.")
-
-        with transaction.atomic():
-            cohort = serializer.save(
-                department=coordinator.department,
-                coordinator=coordinator,
-                programme = coordinator.programme, #made changes here
-            )
-            assign_students(cohort)
-            record_audit(request, "COHORT_CREATED", cohort)
-
-        return Response(CohortSerializer(cohort).data, status=status.HTTP_201_CREATED)
-
 
 class CoordinatorCohortDetailView(APIView):
     permission_classes = [IsAuthenticated, IsCoordinator]
@@ -390,6 +372,49 @@ class AdminCohortListView(APIView):
     def get(self, request):
         cohorts = Cohort.objects.select_related("department", "coordinator__user").order_by("-start_date")
         return Response({"results": CohortSerializer(cohorts, many=True).data})
+
+    def post(self, request):
+        """Admin creates a new cohort and assigns a coordinator to it."""
+        department_id = request.data.get("department_id")
+        coordinator_id = request.data.get("coordinator_id")
+
+        department = Department.objects.filter(pk=department_id).first()
+        if not department:
+            return api_error("department_not_found", "Department was not found.", status.HTTP_404_NOT_FOUND)
+
+        coordinator = CoordinatorProfile.objects.select_related("user", "department").filter(
+            pk=coordinator_id
+        ).first()
+        if not coordinator:
+            return api_error("coordinator_not_found", "Coordinator was not found.", status.HTTP_404_NOT_FOUND)
+
+        # Build payload for the serializer (department and coordinator set separately)
+        payload = {k: v for k, v in request.data.items() if k not in ("department_id", "coordinator_id")}
+        serializer = CohortSerializer(data=payload)
+        serializer.is_valid(raise_exception=True)
+
+        # Validate programme matches coordinator assignment
+        programme = serializer.validated_data.get("programme")
+        if programme != coordinator.programme:
+            return api_error(
+                "programme_mismatch",
+                f"This coordinator is assigned to {coordinator.programme}, not {programme}."
+            )
+        if coordinator.department_id != department.id:
+            return api_error(
+                "department_mismatch",
+                "This coordinator is not assigned to the selected department."
+            )
+
+        with transaction.atomic():
+            cohort = serializer.save(department=department, coordinator=coordinator)
+            assign_students(cohort)
+            record_audit(request, "COHORT_CREATED", cohort, {
+                "department_id": department.id,
+                "coordinator_id": coordinator.id,
+            })
+
+        return Response(CohortSerializer(cohort).data, status=status.HTTP_201_CREATED)
 
 
 class AdminCohortDetailView(APIView):
@@ -690,6 +715,11 @@ class StudentLogbookHomeView(APIView):
         current_week = get_or_create_week(student, current_week_no)
         all_weeks = [get_or_create_week(student, no) for no in range(1, min(current_week_no, student.cohort.total_weeks) + 1)]
 
+        avg = student.weeks.filter(status=WeeklySubmission.Status.REVIEWED).aggregate(
+            avg=Avg("entries__coordinator_review__rating")
+        )["avg"]
+        running_score_avg = round(avg, 2) if avg is not None else None
+
         return Response({
             "server_time": server_time(),
             "currentWeek": self.week_payload(current_week),
@@ -697,6 +727,7 @@ class StudentLogbookHomeView(APIView):
             "totalWeeks": student.cohort.total_weeks,
             "dayNumber": day_number,
             "totalDays": (student.cohort.end_date - student.cohort.start_date).days + 1,
+            "runningScoreAvg": running_score_avg,
             "previousWeeks": [
                 {
                     "id": week.pk,
@@ -1743,8 +1774,8 @@ class AdminUserListView(APIView):
 
     def get(self, request):
         users = LogrAccount.objects.filter(is_superuser=False).order_by("email")
-        search = request.query_params.get("q", "").strip()
-        role = request.query_params.get("role")
+        search = (request.query_params.get("search") or request.query_params.get("q") or "").strip()
+        role = (request.query_params.get("role") or "").upper()
         account_status = request.query_params.get("status")
         if search:
             users = users.filter(
@@ -1761,17 +1792,63 @@ class AdminUserListView(APIView):
             student = get_student(user)
             coordinator = get_coordinator(user)
             profile = student or coordinator
+            dp = student.degree_programme if student else None
+            # Student-specific stats
+            weeks_submitted = 0
+            weeks_reviewed = 0
+            running_score_avg = None
+            enrolled_students_count = None
+            if student:
+                weeks_submitted = student.weeks.filter(
+                    status__in=[WeeklySubmission.Status.SUBMITTED, WeeklySubmission.Status.REVIEWED]
+                ).count()
+                weeks_reviewed = student.weeks.filter(status=WeeklySubmission.Status.REVIEWED).count()
+                avg = student.weeks.filter(status=WeeklySubmission.Status.REVIEWED).aggregate(
+                    avg=Avg("entries__coordinator_review__rating")
+                )["avg"]
+                running_score_avg = round(avg, 2) if avg is not None else None
+            if coordinator:
+                enrolled_students_count = StudentProfile.objects.filter(coordinator=coordinator).count()
             results.append({
                 "id": user.pk,
                 "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
                 "name": f"{user.first_name} {user.last_name}".strip(),
                 "role": "STUDENT" if student else "COORDINATOR" if coordinator else user.role,
                 "status": user.status,
                 "is_active": user.is_active,
+                "date_joined": user.last_login.isoformat()[:10] if user.last_login else None,
                 "department": profile.department.name if profile else None,
+                "degree_programme": dp.name if dp else None,
                 "programme": profile.programme if profile else None,
                 "cohort_id": student.cohort_id if student else None,
                 "coordinator_id": student.coordinator_id if student else None,
+                "coordinator_name": (
+                    f"{student.coordinator.user.first_name} {student.coordinator.user.last_name}".strip()
+                    if student and student.coordinator else None
+                ),
+                # Student-specific
+                "weeks_submitted": weeks_submitted if student else None,
+                "weeks_reviewed": weeks_reviewed if student else None,
+                "running_score_avg": running_score_avg if student else None,
+                # Coordinator-specific
+                "enrolled_students_count": enrolled_students_count if coordinator else None,
+                # Profiles for frontend mapping
+                "student_profile": {
+                    "matric_no": student.matric_no,
+                    "programme": student.programme,
+                    "department_name": student.department.name,
+                    "cohort_id": student.cohort_id,
+                    "weeks_submitted": weeks_submitted,
+                    "total_weeks": student.cohort.total_weeks if student.cohort else 0,
+                    "running_score_avg": running_score_avg,
+                } if student else None,
+                "coordinator_profile": {
+                    "department_name": coordinator.department.name,
+                    "programme": coordinator.programme,
+                    "enrolled_students_count": enrolled_students_count,
+                } if coordinator else None,
             })
         return Response({"results": results})
 
@@ -1781,22 +1858,74 @@ class AdminOverviewView(APIView):
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):
+        from backend.auth.models import CoordinatorInvitation
         today = timezone.localdate()
+
+        # Submission stats
+        total_weeks = WeeklySubmission.objects.count()
+        submitted_weeks = WeeklySubmission.objects.filter(
+            status__in=[WeeklySubmission.Status.SUBMITTED, WeeklySubmission.Status.REVIEWED]
+        ).count()
+        overdue_weeks = WeeklySubmission.objects.filter(
+            status=WeeklySubmission.Status.OPEN,
+            deadline_at__lt=timezone.now(),
+        ).count()
+        submission_rate = round((submitted_weeks / total_weeks) * 100) if total_weeks > 0 else 0
+
         return Response({
             "students": StudentProfile.objects.count(),
             "coordinators": CoordinatorProfile.objects.count(),
+            "departments": Department.objects.count(),
             "active_accounts": LogrAccount.objects.filter(is_active=True, is_superuser=False).count(),
             "active_cohorts": Cohort.objects.filter(
                 start_date__lte=today,
                 end_date__gte=today,
             ).count(),
             "upcoming_cohorts": Cohort.objects.filter(start_date__gt=today).count(),
+            "pending_students": StudentProfile.objects.filter(
+                email_verified=True, cohort__isnull=True
+            ).count(),
+            "pending_invitations": CoordinatorInvitation.objects.filter(
+                status="PENDING"
+            ).count(),
             "weeks_waiting_for_review": WeeklySubmission.objects.filter(
                 status=WeeklySubmission.Status.SUBMITTED,
             ).count(),
             "supervisor_reviews_waiting": SupervisorReview.objects.filter(
                 status=SupervisorReview.Status.SENT,
             ).count(),
+            "overdue_weeks": overdue_weeks,
+            "submission_rate": submission_rate,
+            "cohort_completion_rate": submission_rate,
+        })
+
+
+class AdminPendingStudentsView(APIView):
+    """Students who are verified but not yet assigned to a cohort."""
+    permission_classes = [IsAuthenticated, IsAdmin]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request):
+        students = (
+            StudentProfile.objects
+            .select_related("user", "department", "degree_programme")
+            .filter(email_verified=True, cohort__isnull=True)
+            .order_by("user__date_joined")
+        )
+        return Response({
+            "count": students.count(),
+            "results": [
+                {
+                    "id": s.pk,
+                    "name": f"{s.user.first_name} {s.user.last_name}".strip(),
+                    "email": s.user.email,
+                    "matric_no": s.matric_no,
+                    "department": s.department.name,
+                    "degree_programme": s.degree_programme.name if s.degree_programme else None,
+                    "programme": s.programme,
+                }
+                for s in students
+            ],
         })
 
 
@@ -2002,10 +2131,10 @@ class AdminReportView(APIView):
         if cohort_id and not cohort:
             return api_error("cohort_not_found", "Cohort was not found.", status.HTTP_404_NOT_FOUND)
 
-        students = StudentProfile.objects.select_related("user", "department", "cohort")
-        if cohort:
-            students = students.filter(cohort=cohort)
         if request.query_params.get("format") == "csv":
+            students = StudentProfile.objects.select_related("user", "department", "cohort")
+            if cohort:
+                students = students.filter(cohort=cohort)
             response = HttpResponse(content_type="text/csv")
             response["Content-Disposition"] = 'attachment; filename="logr-report.csv"'
             writer = csv.writer(response)
@@ -2023,20 +2152,56 @@ class AdminReportView(APIView):
                 ])
             return response
 
-        return Response({
-            "students": students.count(),
-            "active_students": students.filter(user__is_active=True).count(),
-            "cohorts": Cohort.objects.count(),
-            "attendance_present": AttendanceRecord.objects.filter(
-                student__in=students, status=AttendanceRecord.Status.PRESENT
-            ).count(),
-            "weeks_submitted": WeeklySubmission.objects.filter(
-                student__in=students, status__in=[WeeklySubmission.Status.SUBMITTED, WeeklySubmission.Status.REVIEWED]
-            ).count(),
-            "weeks_reviewed": WeeklySubmission.objects.filter(
-                student__in=students, status=WeeklySubmission.Status.REVIEWED
-            ).count(),
-        })
+        # Per-department/programme breakdown across all active cohorts
+        cohorts_qs = Cohort.objects.select_related("department").order_by("department__name", "programme")
+        if cohort:
+            cohorts_qs = cohorts_qs.filter(pk=cohort.pk)
+
+        results = []
+        for c in cohorts_qs:
+            dept_students = StudentProfile.objects.filter(cohort=c)
+            total = dept_students.count()
+            total_weeks_possible = WeeklySubmission.objects.filter(cohort=c).count()
+            submitted = WeeklySubmission.objects.filter(
+                cohort=c,
+                status__in=[WeeklySubmission.Status.SUBMITTED, WeeklySubmission.Status.REVIEWED],
+            ).count()
+            missed = WeeklySubmission.objects.filter(
+                cohort=c,
+                status=WeeklySubmission.Status.OPEN,
+                deadline_at__lt=timezone.now(),
+            ).count()
+            approved_ext = ExtensionRequest.objects.filter(
+                week__cohort=c,
+                status=ExtensionRequest.Status.APPROVED,
+            ).count()
+            avg_score = EntryReview.objects.filter(
+                entry__week__cohort=c
+            ).aggregate(avg=Avg("rating"))["avg"]
+            attendance_present = AttendanceRecord.objects.filter(
+                student__in=dept_students,
+                status=AttendanceRecord.Status.PRESENT,
+            ).count()
+            total_attendance = AttendanceRecord.objects.filter(
+                student__in=dept_students,
+            ).count()
+            submission_rate = round((submitted / total_weeks_possible) * 100) if total_weeks_possible > 0 else 0
+            avg_attendance = round((attendance_present / total_attendance) * 100) if total_attendance > 0 else None
+
+            results.append({
+                "id": c.pk,
+                "department": c.department.name,
+                "programme": c.programme,
+                "session": c.session,
+                "enrolled_students": total,
+                "submission_rate": submission_rate,
+                "missed_weeks": missed,
+                "approved_extensions": approved_ext,
+                "average_score": round(avg_score * 20) if avg_score is not None else 0,  # Convert 1-5 to 0-100
+                "average_attendance": avg_attendance,
+            })
+
+        return Response(results)
 
 
 class AdminSupervisorReviewVoidView(APIView):

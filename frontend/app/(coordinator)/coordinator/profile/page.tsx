@@ -71,15 +71,21 @@ export default function CoordinatorProfilePage() {
   const [coordProfile, setCoordProfile] = useState<{
     name: string;
     department: string;
+    faculty?: string;
     programme: string;
     email: string;
     phone: string;
+    enrolledStudents?: number;
+    activeCohort?: string | null;
   }>({
-    name: "Dr. Babatunde",
-    department: "Computer Science & Engineering",
+    name: "Coordinator",
+    department: "—",
+    faculty: "—",
     programme: "SWEP",
-    email: "babatunde@oauife.edu.ng",
-    phone: "+234 803 123 4567",
+    email: "—",
+    phone: "—",
+    enrolledStudents: 0,
+    activeCohort: null,
   });
 
   useEffect(() => {
@@ -88,16 +94,21 @@ export default function CoordinatorProfilePage() {
         const res = await authApi.coordinatorProfile();
         if (res.ok && res.data?.profile) {
           const p = res.data.profile;
+          const fullName = `${p.account.first_name || ""} ${p.account.last_name || ""}`.trim();
+          const dept = (typeof p.department === "string" ? p.department : p.department?.name) || "—";
           setCoordProfile({
-            name: `Dr. ${p.account.first_name} ${p.account.last_name}`.trim(),
-            department: p.department?.name || "Computer Science & Engineering",
+            name: fullName || p.account.email.split("@")[0],
+            department: dept,
+            faculty: p.faculty || "Obafemi Awolowo University",
             programme: p.programme || "SWEP",
             email: p.account.email,
-            phone: p.phone || "+234 803 123 4567",
+            phone: p.phone || "Not set",
+            enrolledStudents: p.enrolled_students ?? 0,
+            activeCohort: p.active_cohort ?? null,
           });
         }
       } catch {
-        // Retain fallback
+        // Retain initial profile
       }
     }
     loadProfile();
@@ -203,11 +214,11 @@ export default function CoordinatorProfilePage() {
             </div>
 
             <div className="space-y-0.5">
-              <InfoRow label="Faculty" value="Faculty of Technology" />
+              <InfoRow label="Faculty" value={coordProfile.faculty || "Obafemi Awolowo University"} />
               <InfoRow label="Department" value={coordProfile.department} />
               <InfoRow label="Assigned Programme" value={`${coordProfile.programme} (Internship Programme)`} />
-              <InfoRow label="Active Cohort" value="2024 / 2025 Academic Session" />
-              <InfoRow label="Assigned Students" value="34 enrolled students" />
+              <InfoRow label="Active Cohort" value={coordProfile.activeCohort ? `${coordProfile.activeCohort} Academic Session` : "Cohort pending announcement"} />
+              <InfoRow label="Assigned Students" value={`${coordProfile.enrolledStudents ?? 0} enrolled student${coordProfile.enrolledStudents !== 1 ? "s" : ""}`} />
               <InfoRow label="Official Email" value={coordProfile.email} mono />
               <InfoRow label="Official Contact" value={coordProfile.phone} mono />
             </div>

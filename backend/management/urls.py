@@ -44,6 +44,7 @@ urlpatterns = [
 
     path("admin/users/", views.AdminUserListView.as_view()),
     path("admin/overview/", views.AdminOverviewView.as_view()),
+    path("admin/pending-students/", views.AdminPendingStudentsView.as_view()),
     path("admin/users/<int:user_id>/status/", views.AdminUserStatusView.as_view()),
     path("admin/users/<int:user_id>/", views.AdminUserDeleteView.as_view()),
     path("admin/students/<int:student_id>/assignment/", views.AdminStudentAssignmentView.as_view()),

@@ -412,43 +412,15 @@ export default function StudentDashboardPage() {
     async function loadDashboard() {
       setLoading(true);
       const res = await studentApi.getDashboard();
-      if (res.ok && res.data) {
+      if (res.ok) {
         setDashboard(res.data);
-      } else {
-        // Fallback to student profile so authenticated identity always displays
-        const profRes = await authApi.studentProfile();
-        if (profRes.ok && profRes.data?.profile) {
-          const p = profRes.data.profile;
-          setDashboard({
-            student: {
-              name: `${p.account.first_name} ${p.account.last_name}`.trim(),
-              matricNo: p.matric_no,
-              department: p.department?.name || "Faculty of Technology",
-              programme: p.programme,
-              institution: "Obafemi Awolowo University",
-              email: p.account.email,
-            },
-            isMatched: false,
-            cohort: null,
-            metrics: {
-              currentWeek: 1,
-              totalWeeks: 12,
-              completionPct: 0,
-              attendanceRate: 100,
-              daysLogged: 0,
-              totalTargetDays: 60,
-              runningScoreAvg: 0,
-              statusText: "Awaiting Session Cohort",
-            },
-            currentWeek: null,
-            weeks: [],
-          });
-        }
+      } else if (res.status === 401) {
+        router.replace("/login");
       }
       setLoading(false);
     }
     loadDashboard();
-  }, []);
+  }, [router]);
 
   async function handleSignOut() {
     await authApi.logout();
@@ -538,7 +510,7 @@ export default function StudentDashboardPage() {
               <p className="text-[11px] text-[#7A7973] font-mono">
                 {isMatched && cohort
                   ? `Week ${dashboard?.metrics.currentWeek || 1} of ${dashboard?.metrics.totalWeeks || 12} · ${cohort.programme} ${cohort.session}`
-                  : `${dashboard?.student.department || "Faculty of Technology"} · ${programme}`}
+                  : `${dashboard?.student.department || "Department Pending"} · ${programme}`}
               </p>
             </div>
           </div>
@@ -647,7 +619,9 @@ export default function StudentDashboardPage() {
                   <p className="text-[10px] font-mono font-medium text-[#7A7973] uppercase tracking-wider">Evaluation Grade</p>
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-[1.5rem] font-extrabold tracking-[-0.035em] text-[#141414]">
-                      {dashboard?.weeks && dashboard.weeks.length > 0 ? "4.5" : "—"}
+                      {dashboard?.metrics.runningScoreAvg && dashboard.metrics.runningScoreAvg > 0
+                        ? dashboard.metrics.runningScoreAvg.toFixed(1)
+                        : "—"}
                     </span>
                     <span className="text-[11px] text-[#7A7973]">/ 5.0</span>
                   </div>

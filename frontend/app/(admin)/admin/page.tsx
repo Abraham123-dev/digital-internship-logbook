@@ -64,6 +64,32 @@ export default function AdminOverviewPage() {
       ) : (
         <div className="space-y-6">
           
+          {/* Pending Students Alert */}
+          {Boolean(stats.pendingStudents && stats.pendingStudents > 0) && (
+            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-7 rounded-full bg-amber-500/20 text-amber-900 items-center justify-center text-[12px] font-bold shrink-0">
+                  {stats.pendingStudents}
+                </span>
+                <div>
+                  <h4 className="text-[13px] font-bold text-amber-950">
+                    {stats.pendingStudents} verified student{stats.pendingStudents === 1 ? "" : "s"} waiting for cohort assignment
+                  </h4>
+                  <p className="text-[11.5px] text-amber-900/80">
+                    Create matching cohorts in the Cohorts portal to auto-enrol them into SWEP or SIWES.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/admin/cohorts"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-900 text-white text-[11.5px] font-semibold hover:bg-amber-950 transition-colors shrink-0"
+              >
+                <span>Manage Cohorts</span>
+                <ChevronRight className="size-3.5" />
+              </Link>
+            </div>
+          )}
+
           {/* Key Administration Metrics Strip */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 shadow-xs">
@@ -76,7 +102,9 @@ export default function AdminOverviewPage() {
                 </span>
                 <span className="text-[11px] text-[#7A7973]">students</span>
               </div>
-              <p className="text-[10.5px] text-[#7A7973] mt-0.5">Across 8 departments</p>
+              <p className="text-[10.5px] text-[#7A7973] mt-0.5">
+                {stats.departments ? `Across ${stats.departments} department${stats.departments !== 1 ? "s" : ""}` : "Across active departments"}
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 shadow-xs">

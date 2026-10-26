@@ -3,22 +3,10 @@
 import { useState, useEffect, useTransition, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { authApi } from "@/lib/api/auth";
-import type { Department, StudentSignupPayload } from "@/lib/api/auth";
+import { authApi, DEFAULT_DEPTS } from "@/lib/api/auth";
+import type { DegreeProgramme, Department, StudentSignupPayload } from "@/lib/api/auth";
 import { ArrowUpRight, Eye, EyeOff } from "lucide-react";
 import { AuthBrandPanel, MobileAuthBar } from "@/components/auth/BrandPanel";
-
-/* ── Default OAU Tech departments fallback ────────────────── */
-const DEFAULT_DEPTS: Department[] = [
-  { id: 1, name: "Computer Science & Engineering" },
-  { id: 2, name: "Electrical & Electronic Engineering" },
-  { id: 3, name: "Mechanical Engineering" },
-  { id: 4, name: "Civil Engineering" },
-  { id: 5, name: "Chemical Engineering" },
-  { id: 6, name: "Agricultural & Environmental Engineering" },
-  { id: 7, name: "Materials Science & Engineering" },
-  { id: 8, name: "Food Science & Technology" },
-];
 
 /* ── Shared field components ─────────────────────────────── */
 function Field({ label, id, children, error, hint }: {
@@ -217,12 +205,13 @@ function VerifiedStep() {
 /* ── Signup form ─────────────────────────────────────────── */
 type FormState = Omit<StudentSignupPayload, "department_id"> & {
   department_id: number | "";
+  degree_programme_id: number | null;
   confirmPassword: string;
 };
 
 const INITIAL: FormState = {
   first_name: "", last_name: "", matric_no: "", email: "",
-  department_id: "", programme: "SWEP", password: "", confirmPassword: "",
+  department_id: "", degree_programme_id: null, programme: "SWEP", password: "", confirmPassword: "",
 };
 
 type Step = "form" | "otp" | "done";
@@ -234,6 +223,8 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [depts, setDepts] = useState<Department[]>(DEFAULT_DEPTS);
+  const [degreeProgrammes, setDegreeProgrammes] = useState<DegreeProgramme[]>([]);
+  const [loadingDegreeProgrammes, setLoadingDegreeProgrammes] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
 
@@ -249,6 +240,32 @@ export default function SignupPage() {
 
   const set = (key: keyof FormState) => (val: string) => setForm((f) => ({ ...f, [key]: val }));
 
+  const handleDepartmentChange = (deptIdVal: number | "") => {
+    setForm((f) => ({ ...f, department_id: deptIdVal, degree_programme_id: null }));
+    if (!deptIdVal) {
+      setDegreeProgrammes([]);
+      return;
+    }
+    const selectedDept = depts.find((d) => d.id === deptIdVal);
+    // Only fetch sub-programmes if the umbrella "Computer Science & Engineering" was selected
+    if (selectedDept && selectedDept.name.toLowerCase() === "computer science & engineering") {
+      setLoadingDegreeProgrammes(true);
+      authApi.degreeProgrammes(Number(deptIdVal)).then((res) => {
+        setLoadingDegreeProgrammes(false);
+        if (res.ok && res.data && res.data.length > 0) {
+          setDegreeProgrammes(res.data);
+        } else {
+          setDegreeProgrammes([]);
+        }
+      }).catch(() => {
+        setLoadingDegreeProgrammes(false);
+        setDegreeProgrammes([]);
+      });
+    } else {
+      setDegreeProgrammes([]);
+    }
+  };
+
   function validate(): boolean {
     const e: Partial<Record<keyof FormState, string>> = {};
     if (!form.first_name.trim()) e.first_name = "Required.";
@@ -256,6 +273,9 @@ export default function SignupPage() {
     if (!form.matric_no.trim()) e.matric_no = "Required.";
     if (!form.email.includes("@")) e.email = "Enter a valid student email.";
     if (!form.department_id) e.department_id = "Select your department.";
+    if (degreeProgrammes.length > 0 && !form.degree_programme_id) {
+      e.degree_programme_id = "Select your degree programme / course.";
+    }
     if (form.password.length < 8) e.password = "Min 8 chars.";
     if (form.password !== form.confirmPassword) e.confirmPassword = "Passwords do not match.";
     setFieldErrors(e);
@@ -267,7 +287,11 @@ export default function SignupPage() {
     setGlobalError(null);
     if (!validate()) return;
     const { confirmPassword: _c, ...rest } = form;
-    const payload: StudentSignupPayload = { ...rest, department_id: rest.department_id as number };
+    const payload: StudentSignupPayload = {
+      ...rest,
+      department_id: rest.department_id as number,
+      degree_programme_id: rest.degree_programme_id ? Number(rest.degree_programme_id) : null,
+    };
     startTransition(async () => {
       const res = await authApi.studentSignup(payload);
       if (!res.ok) {
@@ -297,6 +321,16 @@ export default function SignupPage() {
 
   if (step === "otp") return <RightPanel><OtpStep email={form.email} onVerified={() => setStep("done")} /></RightPanel>;
   if (step === "done") return <RightPanel><VerifiedStep /></RightPanel>;
+
+  const isFcse = (d: Department) =>
+    d.faculty_code === "FCSE" ||
+    (d.faculty && d.faculty.toLowerCase().includes("computer")) ||
+    d.name.toLowerCase().includes("computer") ||
+    d.name.toLowerCase().includes("software") ||
+    d.name.toLowerCase().includes("information");
+
+  const fcseDepts = depts.filter(isFcse);
+  const techDepts = depts.filter((d) => !isFcse(d));
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[340px_1fr] xl:grid-cols-[380px_1fr] font-sans selection:bg-[#F04D23] selection:text-white">
@@ -351,15 +385,50 @@ export default function SignupPage() {
                   placeholder="you@student.oauife.edu.ng" className={inputCls(!!fieldErrors.email)} />
               </Field>
 
-              {/* Department */}
+              {/* Department (grouped by Faculty) */}
               <Field label="Department" id="department_id" error={fieldErrors.department_id}>
-                <select id="department_id" value={form.department_id}
-                  onChange={(e) => setForm((f) => ({ ...f, department_id: Number(e.target.value) || "" }))}
-                  className={inputCls(!!fieldErrors.department_id)}>
+                <select
+                  id="department_id"
+                  value={form.department_id}
+                  onChange={(e) => handleDepartmentChange(e.target.value ? Number(e.target.value) : "")}
+                  className={inputCls(!!fieldErrors.department_id)}
+                >
                   <option value="">Select department…</option>
-                  {depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  <optgroup label="Faculty of Computer Science & Engineering">
+                    {fcseDepts.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Faculty of Technology">
+                    {techDepts.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </Field>
+
+              {/* Degree Programme / Course of Study (for departments like FCSE) */}
+              {degreeProgrammes.length > 0 && (
+                <Field
+                  label="Course / Degree Programme"
+                  id="degree_programme_id"
+                  error={fieldErrors.degree_programme_id}
+                  hint="Select your specific degree programme"
+                >
+                  <select
+                    id="degree_programme_id"
+                    value={form.degree_programme_id ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, degree_programme_id: Number(e.target.value) || null }))}
+                    disabled={loadingDegreeProgrammes}
+                    className={inputCls(!!fieldErrors.degree_programme_id)}
+                  >
+                    <option value="">Select course of study…</option>
+                    {degreeProgrammes.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
 
               {/* Passwords with Eye Toggles */}
               <div className="grid grid-cols-2 gap-2.5">

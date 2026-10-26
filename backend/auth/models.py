@@ -70,15 +70,43 @@ class LogrAccount(AbstractBaseUser):
     def has_module_perms(self, app_label):
         return self.has_perm(None)
 
+
+class Faculty(models.Model):
+    """Top-level academic unit that groups departments (e.g. Faculty of Technology)."""
+    name = models.CharField(max_length=150, unique=True)
+    code = models.CharField(max_length=20, unique=True)  # e.g. "FTECH", "FCSE"
+
+    def __str__(self):
+        return self.name
+
+
 class Department(models.Model):
     """One shared department list keeps student and coordinator assignments consistent."""
 
     id: int
     name = models.CharField(max_length=150, unique=True)
+    faculty = models.ForeignKey(
+        Faculty, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="departments"
+    )
     objects = models.Manager()
 
     def __str__(self):
         return self.name
+
+
+class DegreeProgramme(models.Model):
+    """Specific course of study within a faculty (e.g. Software Engineering, CS with Maths)."""
+    name = models.CharField(max_length=150)
+    faculty = models.ForeignKey(
+        Faculty, on_delete=models.PROTECT, related_name="degree_programmes"
+    )
+
+    class Meta:
+        unique_together = [("name", "faculty")]
+
+    def __str__(self):
+        return f"{self.name} ({self.faculty.code})"
 
 
 class StudentProfile(models.Model):
@@ -86,9 +114,13 @@ class StudentProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     matric_no = models.CharField(max_length=40, unique=True)
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
+    degree_programme = models.ForeignKey(
+        DegreeProgramme, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="students",
+    )
     programme = models.CharField(max_length=10, choices=Programme.choices)
     email_verified = models.BooleanField(default=False)
-    
+
     objects = models.Manager()
     cohort = models.ForeignKey(
         "management.Cohort",
@@ -113,6 +145,7 @@ class CoordinatorProfile(models.Model):
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
     programme = models.CharField(max_length=10, choices=Programme.choices)
     objects = models.Manager()
+
 
 class CoordinatorInvitation(models.Model):
     class Status(models.TextChoices):

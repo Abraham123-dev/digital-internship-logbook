@@ -64,15 +64,15 @@ export default function CoordinatorDashboardPage() {
             pendingReviews: 0,
             pendingExtensions: 0,
             overdueWeeks: 0,
-            averageAttendance: 100,
+            averageAttendance: 0,
           },
           recentSubmissions: [],
           cohortInfo: {
             programme: "SWEP",
-            cycle: "Active Session",
-            weekNumber: 1,
-            totalWeeks: 12,
-            submissionDeadline: "Saturday 11:59 PM",
+            cycle: "No active cohort",
+            weekNumber: 0,
+            totalWeeks: 0,
+            submissionDeadline: "None scheduled",
           },
         });
       }
@@ -92,9 +92,9 @@ export default function CoordinatorDashboardPage() {
     };
   }, []);
 
-  const subtitle = data?.cohortInfo
+  const subtitle = data?.cohortInfo?.totalWeeks
     ? `${data.cohortInfo.programme} · ${data.cohortInfo.cycle}`
-    : undefined;
+    : "No active cohort";
 
   return (
     <CoordinatorShell
@@ -137,7 +137,9 @@ export default function CoordinatorDashboardPage() {
                 <span className="text-[1.5rem] font-extrabold tracking-[-0.035em] text-[#141414]">{data.stats.enrolledStudents}</span>
                 <span className="text-[11px] text-[#7A7973]">students</span>
               </div>
-              <p className="text-[10.5px] text-[#7A7973] mt-0.5">SWEP 2024 cohort</p>
+              <p className="text-[10.5px] text-[#7A7973] mt-0.5">
+                {data.cohortInfo.totalWeeks > 0 ? `${data.cohortInfo.programme} · ${data.cohortInfo.cycle}` : "No active cohort"}
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 shadow-xs">
@@ -146,7 +148,9 @@ export default function CoordinatorDashboardPage() {
                 <span className="text-[1.5rem] font-extrabold tracking-[-0.035em] text-[#141414]">{data.stats.pendingReviews}</span>
                 <span className="text-[11px] text-[#7A7973]">submissions</span>
               </div>
-              <p className="text-[10.5px] text-amber-700 font-medium mt-0.5">Weekly logbooks to evaluate</p>
+              <p className={`text-[10.5px] mt-0.5 ${data.stats.pendingReviews > 0 ? "text-amber-700 font-medium" : "text-[#7A7973]"}`}>
+                {data.stats.pendingReviews > 0 ? "Weekly logbooks to evaluate" : "All reviews caught up"}
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 shadow-xs">
@@ -155,7 +159,9 @@ export default function CoordinatorDashboardPage() {
                 <span className="text-[1.5rem] font-extrabold tracking-[-0.035em] text-[#141414]">{data.stats.pendingExtensions}</span>
                 <span className="text-[11px] text-[#7A7973]">pending</span>
               </div>
-              <p className="text-[10.5px] text-[#7A7973] mt-0.5">Deadline extension appeals</p>
+              <p className={`text-[10.5px] mt-0.5 ${data.stats.pendingExtensions > 0 ? "text-amber-700 font-medium" : "text-[#7A7973]"}`}>
+                {data.stats.pendingExtensions > 0 ? "Deadline extension appeals" : "No pending appeals"}
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 shadow-xs">
@@ -164,7 +170,13 @@ export default function CoordinatorDashboardPage() {
                 <span className="text-[1.5rem] font-extrabold tracking-[-0.035em] text-[#141414]">{data.stats.averageAttendance}%</span>
                 <span className="text-[11px] text-[#7A7973]">cohort average</span>
               </div>
-              <p className="text-[10.5px] text-emerald-700 font-medium mt-0.5">Meets 75% requirement</p>
+              {data.stats.averageAttendance >= 75 ? (
+                <p className="text-[10.5px] text-emerald-700 font-medium mt-0.5">Meets 75% requirement</p>
+              ) : data.stats.averageAttendance > 0 ? (
+                <p className="text-[10.5px] text-amber-700 font-medium mt-0.5">Below 75% requirement</p>
+              ) : (
+                <p className="text-[10.5px] text-[#7A7973] mt-0.5">No attendance logged</p>
+              )}
             </div>
           </div>
 
@@ -242,15 +254,21 @@ export default function CoordinatorDashboardPage() {
               <div className="bg-white rounded-2xl border border-[#E8E7E1] p-5 shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-[#F0EFE9]">
                   <h3 className="text-[13px] font-bold text-[#141414]">Current Cohort</h3>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    Active
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                    data.cohortInfo.totalWeeks > 0
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-[#F3F2EE] text-[#7A7973] border-[#E8E7E1]"
+                  }`}>
+                    {data.cohortInfo.totalWeeks > 0 ? "Active" : "None"}
                   </span>
                 </div>
 
                 <div className="space-y-2 text-[12px]">
                   <div className="flex justify-between py-1 border-b border-[#F0EFE9]">
                     <span className="text-[#7A7973]">Programme</span>
-                    <span className="font-semibold text-[#141414]">SWEP (On-Campus)</span>
+                    <span className="font-semibold text-[#141414]">
+                      {data.cohortInfo.programme}{data.cohortInfo.programme === "SWEP" ? " (On-Campus)" : data.cohortInfo.programme === "SIWES" ? " (Industry)" : ""}
+                    </span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-[#F0EFE9]">
                     <span className="text-[#7A7973]">Academic cycle</span>
@@ -258,7 +276,9 @@ export default function CoordinatorDashboardPage() {
                   </div>
                   <div className="flex justify-between py-1 border-b border-[#F0EFE9]">
                     <span className="text-[#7A7973]">Timeline</span>
-                    <span className="font-semibold text-[#141414]">Week {data.cohortInfo.weekNumber} of {data.cohortInfo.totalWeeks}</span>
+                    <span className="font-semibold text-[#141414]">
+                      {data.cohortInfo.totalWeeks > 0 ? `Week ${data.cohortInfo.weekNumber} of ${data.cohortInfo.totalWeeks}` : "Not active"}
+                    </span>
                   </div>
                   <div className="flex justify-between py-1">
                     <span className="text-[#7A7973]">Next submission deadline</span>

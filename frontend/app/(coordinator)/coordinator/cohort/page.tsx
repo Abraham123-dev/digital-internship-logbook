@@ -19,10 +19,11 @@ export default function CoordinatorCohortPage() {
     let mounted = true;
     async function load() {
       const res = await coordinatorApi.getCohortSettings();
-      if (mounted && res.ok) {
+      if (!mounted) return;
+      if (res.ok) {
         setCohort(res.data);
-        setLoading(false);
       }
+      setLoading(false);
     }
     load();
     return () => {

@@ -15,7 +15,7 @@ export default function SupervisorReviewPage({
   searchParams: Promise<{ token?: string }>;
 }) {
   const unwrappedParams = use(searchParams);
-  const token = unwrappedParams.token || "sample-supervisor-token";
+  const token = unwrappedParams.token || "";
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -36,6 +36,11 @@ export default function SupervisorReviewPage({
 
   useEffect(() => {
     let mounted = true;
+    if (!token) {
+      setErrorState("invalid_token");
+      setLoading(false);
+      return;
+    }
     async function load() {
       const res = await supervisorApi.getReviewBatch(token);
       if (!mounted) return;

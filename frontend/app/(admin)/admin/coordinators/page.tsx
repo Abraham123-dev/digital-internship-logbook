@@ -85,7 +85,6 @@ export default function AdminCoordinatorsPage() {
 
                       <td className="px-4 py-3.5">
                         <div className="text-[#3A3934]">{c.department}</div>
-                        <div className="text-[10.5px] text-[#9A9990]">Faculty of Technology</div>
                       </td>
 
                       <td className="px-4 py-3.5">

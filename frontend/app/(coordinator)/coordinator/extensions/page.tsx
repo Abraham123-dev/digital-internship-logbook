@@ -27,10 +27,13 @@ export default function CoordinatorExtensionsPage() {
     let mounted = true;
     async function load() {
       const res = await coordinatorApi.getExtensionRequests();
-      if (mounted && res.ok) {
+      if (!mounted) return;
+      if (res.ok) {
         setRequests(res.data);
-        setLoading(false);
+      } else {
+        setRequests([]);
       }
+      setLoading(false);
     }
     load();
     return () => {

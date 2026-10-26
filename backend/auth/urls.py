@@ -4,6 +4,8 @@ from .views import (
     AcceptInvitationView,
     AdminLoginView,
     ChangePasswordView,
+    DegreeProgrammeListView,
+    DepartmentListView,
     ForgotPasswordView,
     InvitationListCreateView,
     InvitationManageView,
@@ -37,4 +39,7 @@ urlpatterns = [
     path("admin/invitations/<int:invitation_id>/", InvitationManageView.as_view(), name="invitation-revoke"),
     path("invitations/validate/", ValidateInvitationView.as_view(), name="invitation-validate"),
     path("invitations/accept/", AcceptInvitationView.as_view(), name="invitation-accept"),
+    # Public lookup endpoints
+    path("departments/", DepartmentListView.as_view(), name="department-list"),
+    path("degree-programmes/", DegreeProgrammeListView.as_view(), name="degree-programme-list"),
 ]
