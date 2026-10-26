@@ -45,7 +45,7 @@ export default function AdminCoordinatorsPage() {
       actions={
         <Link
           href="/admin/invitations"
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#141414] text-white text-[11px] font-semibold hover:bg-[#282828] transition-colors shadow-xs"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-[#141414] text-white text-[12px] font-medium hover:bg-[#282828] transition-colors shadow-xs"
         >
           <Plus className="size-3.5" />
           <span>Invite Coordinator</span>
@@ -57,7 +57,7 @@ export default function AdminCoordinatorsPage() {
         {loading ? (
           <AdminTableSkeleton rows={4} />
         ) : (
-          <div className="bg-white rounded-2xl border border-[#E8E7E1] shadow-xs overflow-hidden">
+          <div className="bg-white rounded-lg border border-[#E2E1DA] shadow-2xs overflow-hidden">
             <div className="px-5 py-3.5 border-b border-[#F0EFE9] flex items-center justify-between">
               <h2 className="text-[13px] font-bold text-[#141414]">Department Coordinators</h2>
               <span className="text-[11px] font-mono text-[#7A7973]">{totalItems} active coordinators</span>

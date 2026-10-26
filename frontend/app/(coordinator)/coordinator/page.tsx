@@ -108,7 +108,7 @@ export default function CoordinatorDashboardPage() {
 
           {/* Active Attendance Session Banner — only shown when a real session exists */}
           {attendanceSession && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 p-4 rounded-2xl bg-white border border-[#E8E7E1] shadow-xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 p-4 rounded-lg bg-white border border-[#E2E1DA] shadow-2xs">
               <div className="flex items-center gap-3">
                 <span className="size-2 rounded-full bg-[#F04D23] animate-pulse shrink-0" />
                 <div>
@@ -121,7 +121,7 @@ export default function CoordinatorDashboardPage() {
               </div>
               <Link
                 href="/coordinator/attendance"
-                className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#141414] text-white text-[11px] font-semibold hover:bg-[#282828] transition-colors"
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#141414] text-white text-[11.5px] font-medium hover:bg-[#282828] transition-colors shadow-2xs"
               >
                 <span>Manage session</span>
                 <ChevronRight className="size-3.5" />
@@ -131,7 +131,7 @@ export default function CoordinatorDashboardPage() {
 
           {/* 4 Balanced Metrics */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 shadow-xs">
+            <div className="bg-white rounded-lg border border-[#E2E1DA] p-4 shadow-2xs">
               <p className="text-[10px] font-mono font-medium text-[#7A7973] uppercase tracking-wider">Enrolled Students</p>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-[1.5rem] font-extrabold tracking-[-0.035em] text-[#141414]">{data.stats.enrolledStudents}</span>
@@ -142,7 +142,7 @@ export default function CoordinatorDashboardPage() {
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 shadow-xs">
+            <div className="bg-white rounded-lg border border-[#E2E1DA] p-4 shadow-2xs">
               <p className="text-[10px] font-mono font-medium text-[#7A7973] uppercase tracking-wider">Awaiting Review</p>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-[1.5rem] font-extrabold tracking-[-0.035em] text-[#141414]">{data.stats.pendingReviews}</span>
@@ -153,7 +153,7 @@ export default function CoordinatorDashboardPage() {
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 shadow-xs">
+            <div className="bg-white rounded-lg border border-[#E2E1DA] p-4 shadow-2xs">
               <p className="text-[10px] font-mono font-medium text-[#7A7973] uppercase tracking-wider">Extension Requests</p>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-[1.5rem] font-extrabold tracking-[-0.035em] text-[#141414]">{data.stats.pendingExtensions}</span>
@@ -164,7 +164,7 @@ export default function CoordinatorDashboardPage() {
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 shadow-xs">
+            <div className="bg-white rounded-lg border border-[#E2E1DA] p-4 shadow-2xs">
               <p className="text-[10px] font-mono font-medium text-[#7A7973] uppercase tracking-wider">Average Attendance</p>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-[1.5rem] font-extrabold tracking-[-0.035em] text-[#141414]">{data.stats.averageAttendance}%</span>
@@ -184,7 +184,7 @@ export default function CoordinatorDashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* Left 7 Cols: Weekly Submissions Waiting for Review */}
-            <div className="lg:col-span-7 bg-white rounded-2xl border border-[#E8E7E1] shadow-xs overflow-hidden flex flex-col">
+            <div className="lg:col-span-7 bg-white rounded-lg border border-[#E2E1DA] shadow-2xs overflow-hidden flex flex-col">
               <div className="px-5 py-4 border-b border-[#F0EFE9] flex items-center justify-between">
                 <div>
                   <h3 className="text-[13px] font-bold text-[#141414]">Submissions Awaiting Review</h3>
@@ -192,7 +192,7 @@ export default function CoordinatorDashboardPage() {
                 </div>
                 <Link
                   href="/coordinator/students"
-                  className="text-[11px] font-semibold text-[#141414] hover:underline flex items-center gap-1"
+                  className="text-[11px] font-medium text-[#141414] hover:underline flex items-center gap-1"
                 >
                   View all students <ArrowUpRight className="size-3.5" />
                 </Link>
@@ -207,7 +207,7 @@ export default function CoordinatorDashboardPage() {
                 <div className="divide-y divide-[#F0EFE9] flex-1">
                   {data.recentSubmissions.map((sub) => (
                     <div key={sub.id} className="p-4 sm:p-5 flex items-start gap-3.5 hover:bg-[#FAF9F5] transition-colors">
-                      <div className="size-8 rounded-full bg-[#141414] text-white flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                      <div className="size-8 rounded bg-[#141414] text-white flex items-center justify-center text-[10.5px] font-semibold shrink-0 mt-0.5">
                         {sub.studentName.split(" ").map((n) => n[0]).join("")}
                       </div>
 
@@ -217,7 +217,7 @@ export default function CoordinatorDashboardPage() {
                             <p className="text-[13px] font-bold text-[#141414] truncate">{sub.studentName}</p>
                             <p className="text-[10.5px] text-[#7A7973] font-mono">{sub.matricNo} &middot; Week {sub.weekNumber}</p>
                           </div>
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded border ${
                             sub.status === "PENDING_REVIEW"
                               ? "bg-amber-50 text-amber-700 border-amber-200"
                               : "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -235,7 +235,7 @@ export default function CoordinatorDashboardPage() {
                           <span className="text-[#9A9990]">{sub.dates} &middot; Submitted {sub.submittedAt}</span>
                           <Link
                             href={`/coordinator/review/${sub.id}`}
-                            className="inline-flex items-center gap-1 font-semibold text-[#141414] hover:underline"
+                            className="inline-flex items-center gap-1 font-medium text-[#141414] hover:underline"
                           >
                             Review submission <ChevronRight className="size-3" />
                           </Link>
@@ -248,13 +248,13 @@ export default function CoordinatorDashboardPage() {
             </div>
 
             {/* Right 5 Cols: Cohort Info & Quick Links */}
-            <div className="lg:col-span-5 space-y-6">
+            <div className="lg:col-span-5 space-y-5">
               
               {/* Cohort Details Card */}
-              <div className="bg-white rounded-2xl border border-[#E8E7E1] p-5 shadow-xs space-y-3">
+              <div className="bg-white rounded-lg border border-[#E2E1DA] p-5 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-[#F0EFE9]">
                   <h3 className="text-[13px] font-bold text-[#141414]">Current Cohort</h3>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${
                     data.cohortInfo.totalWeeks > 0
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                       : "bg-[#F3F2EE] text-[#7A7973] border-[#E8E7E1]"
@@ -288,7 +288,7 @@ export default function CoordinatorDashboardPage() {
               </div>
 
               {/* Action Quick Links */}
-              <div className="bg-white rounded-2xl border border-[#E8E7E1] p-5 shadow-xs space-y-3">
+              <div className="bg-white rounded-lg border border-[#E2E1DA] p-5 shadow-2xs space-y-3">
                 <h3 className="text-[13px] font-bold text-[#141414]">Actions</h3>
                 <div className="space-y-2">
                   {[
@@ -300,7 +300,7 @@ export default function CoordinatorDashboardPage() {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="flex items-center justify-between p-3 rounded-xl border border-[#E8E7E1] hover:border-[#D8D7CE] hover:bg-[#FAF9F5] transition-colors group"
+                      className="flex items-center justify-between p-2.5 rounded-md border border-[#E8E7E1] hover:border-[#D5D4CE] hover:bg-[#FAF9F5] transition-colors group"
                     >
                       <div className="flex items-center gap-2.5 text-[12px] font-medium text-[#141414]">
                         <span className="text-[#7A7973] group-hover:text-[#141414] transition-colors">{link.icon}</span>

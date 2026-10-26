@@ -79,13 +79,13 @@ export function AdminShell({
 
         {/* Admin Identity Card */}
         <div className="p-4 border-b border-[#D8D7CE]">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-[#141414]">
-            <div className="size-7 rounded-full bg-[#F04D23] flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+          <div className="flex items-center gap-3 p-2.5 rounded-md bg-[#141414] border border-black/10">
+            <div className="size-6.5 rounded bg-[#F04D23] flex items-center justify-center text-white text-[10.5px] font-bold shrink-0">
               SA
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[12px] font-semibold text-white truncate">System Admin</p>
-              <p className="text-[10px] text-white/50 truncate font-mono">Institutional Governance</p>
+              <p className="text-[10px] text-white/60 truncate font-mono">Institutional Governance</p>
             </div>
           </div>
         </div>
@@ -102,13 +102,13 @@ export function AdminShell({
                 key={item.href}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[12.5px] font-medium transition-colors ${
+                className={`flex items-center justify-between px-3 py-2 rounded-md text-[12.5px] font-medium transition-colors ${
                   active
-                    ? "bg-[#141414] text-white"
-                    : "text-[#5A5954] hover:text-[#141414] hover:bg-white/70"
+                    ? "bg-[#141414] text-white shadow-2xs"
+                    : "text-[#5A5954] hover:text-[#141414] hover:bg-white/80"
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <span className={`shrink-0 ${active ? "text-white" : "text-[#7A7973]"}`}>
                     {item.icon}
                   </span>
@@ -116,7 +116,7 @@ export function AdminShell({
                 </div>
                 {item.badge != null && (
                   <span
-                    className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ${
+                    className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded ${
                       active ? "bg-white text-[#141414]" : "bg-[#F04D23] text-white"
                     }`}
                   >
@@ -132,7 +132,7 @@ export function AdminShell({
         <div className="p-3 border-t border-[#D8D7CE]">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-[12px] font-medium text-[#7A7973] hover:text-red-600 hover:bg-red-50/70 transition-colors"
+            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-md text-[12px] font-medium text-[#7A7973] hover:text-red-600 hover:bg-red-50/70 transition-colors cursor-pointer"
           >
             <LogOut className="size-4 shrink-0" />
             <span>Sign out</span>

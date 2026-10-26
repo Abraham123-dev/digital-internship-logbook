@@ -164,7 +164,7 @@ export default function AdminCohortsPage() {
 
           <button
             onClick={() => handleOpenCreateModal()}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#141414] text-white text-[12px] font-semibold hover:bg-[#282828] transition-all shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-[#141414] text-white text-[12px] font-medium hover:bg-[#282828] transition-all shadow-xs cursor-pointer"
           >
             <Plus className="size-3.5" />
             <span>Create Cohort</span>
@@ -173,7 +173,7 @@ export default function AdminCohortsPage() {
 
         {/* Success Alert Banner */}
         {successMsg && (
-          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[12px] font-semibold flex items-center gap-2 shadow-xs">
+          <div className="p-3.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[12px] font-medium flex items-center gap-2 shadow-2xs">
             <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
             <span>{successMsg}</span>
           </div>
@@ -181,10 +181,10 @@ export default function AdminCohortsPage() {
 
         {/* Pending Students Section if any exist */}
         {pendingStudents.length > 0 && (
-          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+          <div className="p-4 sm:p-5 rounded-lg bg-amber-50/70 border border-amber-200/80 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 rounded-full bg-amber-500/20 text-amber-900 items-center justify-center text-[11px] font-bold">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-6 rounded-md bg-amber-500/20 text-amber-900 items-center justify-center text-[11px] font-bold">
                   {pendingStudents.length}
                 </span>
                 <div>
@@ -199,16 +199,16 @@ export default function AdminCohortsPage() {
 
               <button
                 onClick={() => handleOpenCreateModal()}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-900 text-white text-[11.5px] font-medium hover:bg-amber-950 transition-colors shrink-0"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-amber-900 text-white text-[11.5px] font-medium hover:bg-amber-950 transition-colors shrink-0 cursor-pointer shadow-2xs"
               >
                 <Plus className="size-3" />
                 <span>Create Matching Cohort</span>
               </button>
             </div>
 
-            <div className="overflow-x-auto max-h-48 divide-y divide-amber-200/50 rounded-xl border border-amber-200/60 bg-white/60">
+            <div className="overflow-x-auto max-h-48 divide-y divide-amber-200/50 rounded-md border border-amber-200/60 bg-white/70">
               {pendingStudents.slice(0, 10).map((st) => (
-                <div key={st.id} className="flex items-center justify-between px-3 py-2 text-[11.5px]">
+                <div key={st.id} className="flex items-center justify-between px-3.5 py-2 text-[11.5px]">
                   <div>
                     <span className="font-semibold text-[#141414]">{st.name}</span>
                     <span className="text-[#7A7973] font-mono ml-2">({st.matric_no})</span>
@@ -219,7 +219,7 @@ export default function AdminCohortsPage() {
                       </span>
                     )}
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10.5px] font-semibold">
+                  <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10.5px] font-medium">
                     {st.programme}
                   </span>
                 </div>
@@ -237,7 +237,7 @@ export default function AdminCohortsPage() {
         {loading ? (
           <AdminTableSkeleton rows={2} />
         ) : cohorts.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#E8E7E1] p-10 text-center space-y-3">
+          <div className="bg-white rounded-lg border border-[#E2E1DA] p-10 text-center space-y-3">
             <Calendar className="size-8 text-[#B0AFA9] mx-auto" />
             <h3 className="text-[14px] font-bold text-[#141414]">No Cohorts Created Yet</h3>
             <p className="text-[12px] text-[#7A7973] max-w-sm mx-auto">
@@ -245,49 +245,49 @@ export default function AdminCohortsPage() {
             </p>
             <button
               onClick={() => handleOpenCreateModal()}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#141414] text-white text-[12px] font-semibold hover:bg-[#282828] transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#141414] text-white text-[12px] font-medium hover:bg-[#282828] transition-all cursor-pointer shadow-xs"
             >
               <Plus className="size-3.5" />
               <span>Create First Cohort</span>
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {cohorts.map((cohort) => (
               <div
                 key={cohort.id}
-                className="bg-white rounded-2xl border border-[#E8E7E1] p-5 sm:p-6 shadow-xs space-y-4 hover:border-[#D8D7CE] transition-all"
+                className="bg-white rounded-lg border border-[#E2E1DA] p-5 shadow-2xs space-y-3.5 hover:border-[#D0CEBF] transition-all"
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-[#7A7973]">
+                    <span className="text-[10.5px] font-mono text-[#7A7973] uppercase tracking-wide">
                       Academic Session {cohort.academicYear}
                     </span>
                     <h3 className="text-[14px] font-bold text-[#141414] mt-0.5">{cohort.name}</h3>
                   </div>
 
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                     <CheckCircle2 className="size-2.5" /> {cohort.status}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-[#FAF9F5] border border-[#E8E7E1] text-[11.5px]">
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-md bg-[#FAF9F6] border border-[#E8E7E1] text-[11.5px]">
                   <div>
-                    <span className="text-[#7A7973] block text-[10px] uppercase">Programme</span>
+                    <span className="text-[#7A7973] block text-[10px] uppercase font-mono tracking-wider">Programme</span>
                     <span className="font-semibold text-[#141414]">{cohort.programme}</span>
                   </div>
                   <div>
-                    <span className="text-[#7A7973] block text-[10px] uppercase">Enrolled Students</span>
+                    <span className="text-[#7A7973] block text-[10px] uppercase font-mono tracking-wider">Enrolled Students</span>
                     <span className="font-semibold text-[#141414]">{cohort.studentsCount} students</span>
                   </div>
                   <div>
-                    <span className="text-[#7A7973] block text-[10px] uppercase">Assigned Coordinator</span>
+                    <span className="text-[#7A7973] block text-[10px] uppercase font-mono tracking-wider">Assigned Coordinator</span>
                     <span className="font-semibold text-[#141414]">
                       {cohort.coordinator?.name || "Assigned"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[#7A7973] block text-[10px] uppercase">Duration</span>
+                    <span className="text-[#7A7973] block text-[10px] uppercase font-mono tracking-wider">Duration</span>
                     <span className="font-semibold text-[#141414]">{cohort.startDate} – {cohort.endDate}</span>
                   </div>
                 </div>
@@ -303,18 +303,20 @@ export default function AdminCohortsPage() {
 
         {/* Create Cohort Modal */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl border border-[#E8E7E1] w-full max-w-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0EFE9]">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs">
+            <div className="bg-white rounded-lg border border-[#D5D4CD] w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E7E1] bg-[#FAF9F6]">
                 <div>
-                  <h3 className="text-[14px] font-bold text-[#141414]">Create Academic Cohort</h3>
-                  <p className="text-[11.5px] text-[#7A7973]">
+                  <h3 className="text-[15px] font-semibold text-[#141414] tracking-tight">Create Academic Cohort</h3>
+                  <p className="text-[12px] text-[#6E6D67] mt-0.5">
                     Define the internship programme cycle and assign its coordinator.
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-1 rounded-lg text-[#7A7973] hover:text-[#141414] hover:bg-[#F0EFE9] transition-colors"
+                  className="p-1.5 rounded-md text-[#7A7973] hover:text-[#141414] hover:bg-[#EAE8E0] transition-colors cursor-pointer"
                 >
                   <X className="size-4" />
                 </button>
@@ -322,7 +324,7 @@ export default function AdminCohortsPage() {
 
               <form onSubmit={handleCreateCohort} className="p-6 space-y-4">
                 {formError && (
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[11.5px] flex items-center gap-2">
+                  <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-[12px] flex items-center gap-2">
                     <AlertCircle className="size-4 shrink-0 text-red-500" />
                     <span>{formError}</span>
                   </div>
@@ -330,27 +332,27 @@ export default function AdminCohortsPage() {
 
                 {/* Academic Session + Programme */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
-                      Academic Session
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-medium text-[#2E2D29]">
+                      Academic Session *
                     </label>
                     <input
                       type="text"
                       placeholder="e.g. 2024/2025"
                       value={formData.session}
                       onChange={(e) => setFormData({ ...formData, session: e.target.value })}
-                      className="w-full h-9 px-3 rounded-xl border border-[#D8D7CE] text-[12.5px] outline-none focus:border-[#F04D23]"
+                      className="w-full h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[13px] text-[#141414] placeholder:text-[#9A9990] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
-                      Programme
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-medium text-[#2E2D29]">
+                      Programme *
                     </label>
                     <select
                       value={formData.programme}
                       onChange={(e) => setFormData({ ...formData, programme: e.target.value as "SWEP" | "SIWES" })}
-                      className="w-full h-9 px-3 rounded-xl border border-[#D8D7CE] text-[12.5px] outline-none focus:border-[#F04D23] bg-white"
+                      className="w-full h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[13px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                     >
                       <option value="SWEP">SWEP (200L / 300L)</option>
                       <option value="SIWES">SIWES (400L)</option>
@@ -359,14 +361,14 @@ export default function AdminCohortsPage() {
                 </div>
 
                 {/* Department */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
-                    Department
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-medium text-[#2E2D29]">
+                    Department *
                   </label>
                   <select
                     value={formData.department_id}
                     onChange={(e) => setFormData({ ...formData, department_id: Number(e.target.value) || "" })}
-                    className="w-full h-9 px-3 rounded-xl border border-[#D8D7CE] text-[12.5px] outline-none focus:border-[#F04D23] bg-white"
+                    className="w-full h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[13px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                   >
                     <option value="">Select department…</option>
                     <optgroup label="Faculty of Computer Science & Engineering">
@@ -383,14 +385,14 @@ export default function AdminCohortsPage() {
                 </div>
 
                 {/* Coordinator Assignment */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
-                    Assign Coordinator
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-medium text-[#2E2D29]">
+                    Assign Coordinator *
                   </label>
                   <select
                     value={formData.coordinator_id}
                     onChange={(e) => setFormData({ ...formData, coordinator_id: Number(e.target.value) || "" })}
-                    className="w-full h-9 px-3 rounded-xl border border-[#D8D7CE] text-[12.5px] outline-none focus:border-[#F04D23] bg-white"
+                    className="w-full h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[13px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                   >
                     <option value="">Select coordinator for this department & programme…</option>
                     {eligibleCoordinators.map((c) => (
@@ -403,41 +405,41 @@ export default function AdminCohortsPage() {
                     )}
                   </select>
                   {eligibleCoordinators.length === 0 && (
-                    <p className="text-[10.5px] text-[#9A9990]">
-                      Tip: Invite a coordinator for this department under Coordinators tab first.
+                    <p className="text-[11.5px] text-[#7A7973] pt-0.5">
+                      Tip: Invite a coordinator for this department under the Coordinators tab first.
                     </p>
                   )}
                 </div>
 
                 {/* Dates & Weeks */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
-                      Start Date
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-medium text-[#2E2D29]">
+                      Start Date *
                     </label>
                     <input
                       type="date"
                       value={formData.start_date}
                       onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                      className="w-full h-9 px-2.5 rounded-xl border border-[#D8D7CE] text-[12px] outline-none focus:border-[#F04D23]"
+                      className="w-full h-9.5 px-2.5 rounded-md border border-[#D5D4CE] bg-white text-[12.5px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
-                      End Date
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-medium text-[#2E2D29]">
+                      End Date *
                     </label>
                     <input
                       type="date"
                       value={formData.end_date}
                       onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                      className="w-full h-9 px-2.5 rounded-xl border border-[#D8D7CE] text-[12px] outline-none focus:border-[#F04D23]"
+                      className="w-full h-9.5 px-2.5 rounded-md border border-[#D5D4CE] bg-white text-[12.5px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
-                      Total Weeks
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-medium text-[#2E2D29]">
+                      Total Weeks *
                     </label>
                     <input
                       type="number"
@@ -445,25 +447,26 @@ export default function AdminCohortsPage() {
                       max={52}
                       value={formData.total_weeks}
                       onChange={(e) => setFormData({ ...formData, total_weeks: Number(e.target.value) || 12 })}
-                      className="w-full h-9 px-2.5 rounded-xl border border-[#D8D7CE] text-[12px] outline-none focus:border-[#F04D23]"
+                      className="w-full h-9.5 px-2.5 rounded-md border border-[#D5D4CE] bg-white text-[12.5px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                     />
                   </div>
                 </div>
 
-                <div className="pt-3 flex items-center justify-end gap-2 border-t border-[#F0EFE9]">
+                {/* Footer Buttons */}
+                <div className="pt-3 -mx-6 -mb-6 px-6 py-3.5 bg-[#FAF9F6] border-t border-[#E8E7E1] flex items-center justify-end gap-2.5">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-[12px] font-medium text-[#7A7973] hover:text-[#141414] hover:bg-[#F0EFE9] transition-colors"
+                    className="px-3.5 py-2 rounded-md border border-[#D5D4CE] bg-white text-[12.5px] font-medium text-[#4A4944] hover:bg-[#F3F2EE] hover:text-[#141414] transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="px-5 py-2 rounded-xl bg-[#141414] text-white text-[12px] font-semibold hover:bg-[#282828] transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                    className="px-4.5 py-2 rounded-md bg-[#141414] text-white text-[12.5px] font-medium hover:bg-[#282828] active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-xs"
                   >
-                    {isPending ? "Creating…" : "Create & Auto-Enrol"}
+                    {isPending ? "Creating cohort…" : "Create & Auto-Enrol"}
                   </button>
                 </div>
               </form>
