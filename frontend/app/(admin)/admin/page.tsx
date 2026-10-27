@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Users, Shield, Mail, Clock, CheckCircle2,
   AlertCircle, ArrowUpRight, ChevronRight, FileSpreadsheet,
-  Plus, History
+  Plus, History, Building2, GraduationCap
 } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminOverviewSkeleton } from "@/components/admin/AdminSkeletons";
@@ -15,6 +15,7 @@ export default function AdminOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [recentLogs, setRecentLogs] = useState<AdminAuditEntry[]>([]);
+  const [activeFacultyId, setActiveFacultyId] = useState<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -26,6 +27,9 @@ export default function AdminOverviewPage() {
       if (!mounted) return;
       if (statsRes.ok) {
         setStats(statsRes.data);
+        if (statsRes.data.facultyBreakdown && statsRes.data.facultyBreakdown.length > 0) {
+          setActiveFacultyId(statsRes.data.facultyBreakdown[0].id);
+        }
       } else {
         setStats({
           totalStudents: 0,
@@ -150,6 +154,112 @@ export default function AdminOverviewPage() {
               <p className="text-[10.5px] text-red-600 font-medium mt-0.5">Past submission cutoff</p>
             </div>
           </div>
+
+          {/* Sleek, Compact Faculty & Department Breakdown Widget */}
+          {stats.facultyBreakdown && stats.facultyBreakdown.length > 0 && (
+            <div className="bg-white rounded-2xl border border-[#E8E7E1] p-4 sm:p-5 shadow-xs space-y-3.5">
+              
+              {/* Header with Segmented Faculty Toggle & Direct Link */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#F0EFE9]">
+                <div className="flex items-center gap-2.5">
+                  <div className="size-8 rounded-xl bg-[#FAF9F5] border border-[#E8E7E1] flex items-center justify-center text-[#141414]">
+                    <Building2 className="size-4 text-[#7A7973]" />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-bold text-[#141414] leading-tight">Faculty Enrolment Breakdown</h3>
+                    <p className="text-[11px] text-[#7A7973]">
+                      {stats.totalStudents} total students across {stats.facultyBreakdown.length} faculties
+                    </p>
+                  </div>
+                </div>
+
+                {/* Compact Faculty Selector Pills */}
+                <div className="flex items-center gap-1.5 bg-[#FAF9F5] p-1 rounded-xl border border-[#E8E7E1] self-start sm:self-auto">
+                  {stats.facultyBreakdown.map((fac) => {
+                    const isActive = (activeFacultyId ?? stats.facultyBreakdown?.[0]?.id) === fac.id;
+                    const isFcse = fac.code === "FCSE";
+                    return (
+                      <button
+                        key={fac.id}
+                        type="button"
+                        onClick={() => setActiveFacultyId(fac.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                          isActive
+                            ? "bg-white text-[#141414] shadow-xs border border-[#E0DFD8]"
+                            : "text-[#7A7973] hover:text-[#141414]"
+                        }`}
+                      >
+                        <span className={`size-1.5 rounded-full ${isFcse ? "bg-indigo-600" : "bg-emerald-600"}`} />
+                        <span>{fac.code}</span>
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                            isActive ? "bg-[#141414] text-white" : "bg-[#EFEFEA] text-[#7A7973]"
+                          }`}
+                        >
+                          {fac.studentsCount}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Faculty Details & Department Grid */}
+              {(() => {
+                const activeFac =
+                  stats.facultyBreakdown.find((f) => f.id === activeFacultyId) ||
+                  stats.facultyBreakdown[0];
+                if (!activeFac) return null;
+                return (
+                  <div className="space-y-3">
+                    {/* Subheader bar with Faculty name & Direct Link */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11.5px]">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-[#141414]">{activeFac.name}</span>
+                        <span className="text-[#9A9990]">&middot;</span>
+                        <span className="text-[#7A7973] font-mono text-[11px]">{activeFac.departmentsCount} departments</span>
+                        <span className="text-[#9A9990]">&middot;</span>
+                        <span className="text-[#7A7973] font-mono text-[11px]">{activeFac.coordinatorsCount} coordinators</span>
+                      </div>
+
+                      <Link
+                        href={`/admin/students?faculty=${activeFac.id}`}
+                        className="text-[11px] font-semibold text-[#141414] hover:underline flex items-center gap-1 shrink-0 self-start sm:self-auto"
+                      >
+                        <span>View all {activeFac.code} students</span>
+                        <ArrowUpRight className="size-3" />
+                      </Link>
+                    </div>
+
+                    {/* Compact 2/3/4 Column Grid of Departments */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                      {activeFac.departments.map((dept) => (
+                        <Link
+                          key={dept.id}
+                          href={`/admin/students?faculty=${activeFac.id}&department=${dept.id}`}
+                          className="flex items-center justify-between p-2.5 rounded-xl border border-[#EFEFEA] bg-[#FAF9F5] hover:bg-white hover:border-[#141414] transition-all group"
+                          title={`Filter students in ${dept.name}`}
+                        >
+                          <span className="text-[11.5px] font-medium text-[#3A3934] group-hover:text-[#141414] truncate mr-2">
+                            {dept.name}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md shrink-0 transition-colors ${
+                              dept.studentsCount > 0
+                                ? "bg-[#141414] text-white"
+                                : "bg-[#EAE9E3] text-[#7A7973] group-hover:bg-[#DEDCD4]"
+                            }`}
+                          >
+                            {dept.studentsCount}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Lower 12-Column Section */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

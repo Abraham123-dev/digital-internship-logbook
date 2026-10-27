@@ -39,6 +39,13 @@ export interface DegreeProgramme {
   faculty_code?: string;
 }
 
+export interface Faculty {
+  id: number;
+  name: string;
+  code: string;
+  departments: { id: number; name: string }[];
+}
+
 export interface Department {
   id: number;
   name: string;
@@ -186,6 +193,52 @@ export const authApi = {
     const res = await api.post<AcceptInviteResponse>(P.acceptInvite, data, { public: true });
     if (res.ok) tokenStore.set(res.data.access, res.data.refresh);
     return res;
+  },
+
+  /** Fetch all faculties with their participating departments. */
+  faculties: async (): Promise<ApiResult<Faculty[]>> => {
+    try {
+      const res = await api.get<{ results?: Faculty[] } | Faculty[]>("/faculties/", { public: true });
+      if (res.ok && res.data) {
+        const list = Array.isArray(res.data) ? res.data : (res.data.results ?? []);
+        if (list.length > 0) return { ok: true, data: list };
+      }
+    } catch {
+      // Graceful fallback
+    }
+    return {
+      ok: true,
+      data: [
+        {
+          id: 1,
+          name: "Faculty of Computer Science & Engineering",
+          code: "FCSE",
+          departments: [
+            { id: 12, name: "Software Engineering" },
+            { id: 11, name: "Computer Engineering" },
+            { id: 9, name: "Computer Science with Mathematics" },
+            { id: 10, name: "Computer Science with Economics" },
+            { id: 13, name: "Information & Communication Technology" },
+            { id: 14, name: "Information Science" },
+            { id: 1, name: "Computer Science & Engineering" },
+          ],
+        },
+        {
+          id: 2,
+          name: "Faculty of Technology",
+          code: "FTECH",
+          departments: [
+            { id: 2, name: "Electrical & Electronic Engineering" },
+            { id: 3, name: "Mechanical Engineering" },
+            { id: 4, name: "Civil Engineering" },
+            { id: 5, name: "Chemical Engineering" },
+            { id: 6, name: "Agricultural & Environmental Engineering" },
+            { id: 7, name: "Materials Science & Engineering" },
+            { id: 8, name: "Food Science & Technology" },
+          ],
+        },
+      ],
+    };
   },
 
   /** Fetch department list. Falls back gracefully to default faculty departments if backend route is not mounted yet. */

@@ -43,6 +43,23 @@ export interface AdminOverview {
   supervisor_reviews_waiting?: number;
 }
 
+export interface FacultyBreakdownDepartment {
+  id: number;
+  name: string;
+  studentsCount: number;
+  coordinatorsCount: number;
+}
+
+export interface FacultyBreakdownItem {
+  id: number;
+  name: string;
+  code: string;
+  studentsCount: number;
+  coordinatorsCount: number;
+  departmentsCount: number;
+  departments: FacultyBreakdownDepartment[];
+}
+
 export interface AdminStats {
   totalStudents: number;
   activeCoordinators: number;
@@ -52,6 +69,17 @@ export interface AdminStats {
   overdueWeeksCount: number;
   pendingStudents?: number;
   departments?: number;
+  facultyBreakdown?: FacultyBreakdownItem[];
+}
+
+export interface AdminCohortDepartment {
+  id: number;
+  name: string;
+  coordinator: {
+    id: number;
+    email: string;
+    name: string;
+  } | null;
 }
 
 export interface AdminCohortItem {
@@ -60,6 +88,12 @@ export interface AdminCohortItem {
   academicYear: string;
   session?: string;
   programme: string;
+  faculty?: {
+    id: number;
+    name: string;
+    code: string;
+  } | null;
+  departments: AdminCohortDepartment[];
   departmentsCount: number;
   studentsCount: number;
   startDate: string;
@@ -76,8 +110,9 @@ export interface AdminCohortItem {
 }
 
 export interface CreateCohortPayload {
-  department_id: number;
-  coordinator_id: number;
+  name?: string;
+  faculty_id?: number;
+  department_ids?: number[];
   session: string;
   programme: "SWEP" | "SIWES";
   start_date: string;
@@ -88,6 +123,9 @@ export interface CreateCohortPayload {
   deadline_time?: string;
   min_filled_chars?: number;
   request_window_days?: number;
+  // Legacy single-department fields (optional)
+  department_id?: number;
+  coordinator_id?: number;
 }
 
 export interface PendingStudentItem {
@@ -119,7 +157,11 @@ export interface AdminStudentItem {
   name: string;
   matricNo: string;
   email: string;
+  departmentId?: number;
   department: string;
+  facultyId?: number;
+  facultyName?: string;
+  facultyCode?: string;
   programme: string;
   coordinatorName?: string;
   status: "ACTIVE" | "DEACTIVATED" | "GRADUATED";
@@ -184,6 +226,20 @@ export const adminApi = {
       overdueWeeksCount: d.overdue_weeks ?? d.overdue_weeks_count ?? 0,
       pendingStudents: d.pending_students ?? 0,
       departments: d.departments ?? d.active_departments ?? 0,
+      facultyBreakdown: d.faculty_breakdown ? d.faculty_breakdown.map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        code: f.code,
+        studentsCount: f.students_count ?? 0,
+        coordinatorsCount: f.coordinators_count ?? 0,
+        departmentsCount: f.departments_count ?? (f.departments ? f.departments.length : 0),
+        departments: (f.departments || []).map((dep: any) => ({
+          id: dep.id,
+          name: dep.name,
+          studentsCount: dep.students_count ?? 0,
+          coordinatorsCount: dep.coordinators_count ?? 0,
+        })),
+      })) : [],
     };
     return { ok: true, data: stats };
   },
@@ -235,27 +291,42 @@ export const adminApi = {
     const res = await api.get<any>("/admin/cohorts/");
     if (!res.ok) return res;
     const rawList = Array.isArray(res.data) ? res.data : (res.data?.results || []);
-    const mapped: AdminCohortItem[] = rawList.map((c: any) => ({
-      id: c.id,
-      name: `${c.department || c.department_name || "—"} — ${c.programme}`,
-      academicYear: c.session || "",
-      session: c.session,
-      programme: c.programme || "SWEP",
-      departmentsCount: 1,
-      studentsCount: c.students_count ?? c.studentsCount ?? 0,
-      startDate: c.start_date || "",
-      endDate: c.end_date || "",
-      start_date: c.start_date,
-      end_date: c.end_date,
-      total_weeks: c.total_weeks ?? undefined,
-      status: c.status || "UPCOMING",
-      coordinator: c.coordinator,
-    }));
+    const mapped: AdminCohortItem[] = rawList.map((c: any) => {
+      const depts: AdminCohortDepartment[] = Array.isArray(c.departments) ? c.departments : [];
+      return {
+        id: c.id,
+        name: c.name || `${c.faculty?.code || c.programme} — ${c.session}`,
+        academicYear: c.session || "",
+        session: c.session,
+        programme: c.programme || "SWEP",
+        faculty: c.faculty || null,
+        departments: depts,
+        departmentsCount: depts.length || (c.department ? 1 : 0),
+        studentsCount: c.enrolled_students ?? c.students_count ?? c.studentsCount ?? 0,
+        startDate: c.start_date || "",
+        endDate: c.end_date || "",
+        start_date: c.start_date,
+        end_date: c.end_date,
+        total_weeks: c.total_weeks ?? undefined,
+        status: c.status || "UPCOMING",
+        coordinator: c.coordinator,
+      };
+    });
     return { ok: true, data: mapped };
   },
 
   createCohort(payload: CreateCohortPayload): Promise<ApiResult<AdminCohortItem>> {
     return api.post("/admin/cohorts/", payload);
+  },
+
+  assignCohortDepartmentCoordinator(
+    cohortId: number,
+    departmentId: number,
+    coordinatorId: number | null
+  ): Promise<ApiResult<any>> {
+    return api.patch(`/admin/cohorts/${cohortId}/departments/${departmentId}/coordinator/`, {
+      coordinator_id: coordinatorId,
+    });
   },
 
   getPendingStudents(): Promise<ApiResult<{ count: number; results: PendingStudentItem[] }>> {
@@ -302,11 +373,22 @@ export const adminApi = {
     pageSize?: number;
     search?: string;
     status?: string;
+    facultyId?: number | string;
+    departmentId?: number | string;
   }): Promise<ApiResult<{ results: AdminStudentItem[]; totalPages: number; total: number }>> {
-    const res = await this.getUsers({ role: "student", search: params?.search, page: params?.page });
+    const extra: Record<string, string> = {};
+    if (params?.facultyId && params.facultyId !== "ALL") extra.faculty_id = String(params.facultyId);
+    if (params?.departmentId && params.departmentId !== "ALL") extra.department_id = String(params.departmentId);
+    if (params?.status && params.status !== "ALL") extra.status = params.status;
+    const res = await this.getUsers({
+      role: "student",
+      search: params?.search,
+      page: params?.page,
+      ...extra,
+    });
     if (!res.ok) return res as any;
     const users = res.data.results || [];
-    const pageSize = params?.pageSize ?? 5;
+    const pageSize = params?.pageSize ?? 10;
     const mapped: AdminStudentItem[] = users.map((u: any) => {
       const fullName = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
       const profile = u.student_profile || {};
@@ -315,7 +397,11 @@ export const adminApi = {
         name: fullName || u.name || (u.email ? u.email.split("@")[0] : "Student"),
         matricNo: profile.matric_no || u.matric_no || u.matricNo || "—",
         email: u.email || "",
+        departmentId: profile.department_id || u.department_id,
         department: profile.department_name || u.department || "—",
+        facultyId: profile.faculty_id || u.faculty_id,
+        facultyName: profile.faculty_name || u.faculty_name,
+        facultyCode: profile.faculty_code || u.faculty_code,
         programme: profile.programme || u.programme || "—",
         coordinatorName: u.coordinator_name || profile.coordinator_name || "—",
         status: (u.status === "DEACTIVATED" || u.is_active === false) ? "DEACTIVATED" : "ACTIVE",
@@ -371,11 +457,17 @@ export const adminApi = {
     role?: string;
     search?: string;
     page?: number;
+    status?: string;
+    faculty_id?: string | number;
+    department_id?: string | number;
   }): Promise<ApiResult<{ results: AdminUser[]; count: number }>> {
     const qs = new URLSearchParams();
     if (params?.role) qs.set("role", params.role);
     if (params?.search) qs.set("search", params.search);
     if (params?.page) qs.set("page", String(params.page));
+    if (params?.status) qs.set("status", params.status);
+    if (params?.faculty_id) qs.set("faculty_id", String(params.faculty_id));
+    if (params?.department_id) qs.set("department_id", String(params.department_id));
     const query = qs.toString() ? `?${qs.toString()}` : "";
     return api.get(`/admin/users/${query}`);
   },

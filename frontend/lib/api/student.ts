@@ -44,8 +44,20 @@ export interface StudentWeekSummary {
 
 export interface CohortData {
   id: number;
+  name?: string;
   department: string;
-  coordinator: string;
+  department_name?: string;
+  coordinator?: string;
+  coordinator_name?: string | null;
+  coordinator_email?: string | null;
+  has_coordinator?: boolean;
+  has_started?: boolean;
+  days_until_start?: number;
+  faculty?: {
+    id: number;
+    name: string;
+    code: string;
+  } | null;
   programme: ProgrammeType;
   session: string;
   start_date: string;

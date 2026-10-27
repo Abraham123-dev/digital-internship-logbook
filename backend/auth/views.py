@@ -113,7 +113,20 @@ def try_auto_assign(student):
     """Hybrid enrolment: auto-assign a verified student to the earliest open cohort if they don't have one."""
     if student.cohort or not student.email_verified:
         return
-    from backend.management.models import Cohort
+    from backend.management.models import Cohort, CohortDepartmentAssignment
+    # First check multi-dept cohorts where student's department is participating
+    assignment = CohortDepartmentAssignment.objects.select_related("cohort", "coordinator").filter(
+        department=student.department,
+        cohort__programme=student.programme,
+        cohort__end_date__gte=timezone.localdate(),
+    ).order_by("cohort__start_date").first()
+    if assignment:
+        student.cohort = assignment.cohort
+        student.coordinator = assignment.coordinator
+        student.save(update_fields=["cohort", "coordinator"])
+        return
+
+    # Fallback to legacy single-dept cohort
     cohort = Cohort.objects.filter(
         department=student.department,
         programme=student.programme,
@@ -210,17 +223,7 @@ class VerifyOTPView(APIView):
                     degree_programme=degree_programme,
                     email_verified=True,
                 )
-                from backend.management.models import Cohort
-
-                cohort = Cohort.objects.filter(
-                    department=department,
-                    programme=profile.programme,
-                    end_date__gte=timezone.localdate(),
-                ).order_by("start_date").first()
-                if cohort:
-                    profile.cohort = cohort
-                    profile.coordinator = cohort.coordinator
-                    profile.save(update_fields=["cohort", "coordinator"])
+                try_auto_assign(profile)
                 user.is_active = True
                 user.save(update_fields=["is_active"])
         except (LogrAccount.DoesNotExist, Department.DoesNotExist):
@@ -578,12 +581,25 @@ class AcceptInvitationView(APIView):
                     last_name=serializer.validated_data["last_name"],
                     role=LogrAccount.Role.COORDINATOR,
                 )
-                CoordinatorProfile.objects.create(
+                coordinator_profile = CoordinatorProfile.objects.create(
                     user=user,
                     department=invitation.department,
                     programme=invitation.programme,
                     phone=serializer.validated_data["phone"],
                 )
+                from backend.management.models import CohortDepartmentAssignment
+                from backend.management.views import sync_coordinator_to_students
+                unassigned_assignments = CohortDepartmentAssignment.objects.filter(
+                    department=invitation.department,
+                    cohort__programme=invitation.programme,
+                    cohort__end_date__gte=timezone.localdate(),
+                    coordinator__isnull=True,
+                )
+                for assign in unassigned_assignments:
+                    assign.coordinator = coordinator_profile
+                    assign.save(update_fields=["coordinator"])
+                    sync_coordinator_to_students(assign)
+
                 invitation.status = "ACCEPTED"
                 invitation.save(update_fields=["status"])
         except IntegrityError:
@@ -630,4 +646,22 @@ class DegreeProgrammeListView(APIView):
         elif faculty_id:
             programmes = programmes.filter(faculty_id=faculty_id)
         return Response({'results': [{'id': p.id, 'name': p.name, 'faculty_id': p.faculty_id, 'faculty_code': p.faculty.code} for p in programmes]})
+
+
+class FacultyListView(APIView):
+    """Public endpoint - returns all faculties and their departments."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        faculties = Faculty.objects.prefetch_related('departments').all().order_by('name')
+        return Response({'results': [
+            {
+                'id': f.id,
+                'name': f.name,
+                'code': f.code,
+                'departments': [{'id': d.id, 'name': d.name} for d in f.departments.all()]
+            }
+            for f in faculties
+        ]})
 

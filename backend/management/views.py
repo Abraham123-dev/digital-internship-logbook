@@ -18,12 +18,13 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from backend.auth.email_service import EmailDeliveryError, send_email
-from backend.auth.models import CoordinatorProfile, Department, DegreeProgramme, LogrAccount, Programme, StudentProfile
+from backend.auth.models import CoordinatorProfile, Department, DegreeProgramme, Faculty, LogrAccount, Programme, StudentProfile
 from .models import (
     AttendanceRecord,
     AttendanceSession,
     AuditLog,
     Cohort,
+    CohortDepartmentAssignment,
     EntryReview,
     ExtensionRequest,
     InAppNotification,
@@ -171,12 +172,43 @@ class NotificationReadAllView(APIView):
 
 
 def assign_students(cohort):
-    """Assign matching students who do not already belong to a cohort."""
+    """Assign eligible students from all participating departments to this cohort.
+
+    For each CohortDepartmentAssignment, enrol verified students from that
+    department who are not yet in any cohort. Coordinator assignment on the
+    student profile is set only when the dept assignment already has one;
+    otherwise the coordinator field stays NULL until one is assigned later.
+    """
+    assignments = cohort.department_assignments.select_related("department", "coordinator").all()
+    if assignments.exists():
+        # New-style multi-department cohort
+        for assignment in assignments:
+            students = StudentProfile.objects.filter(
+                department=assignment.department,
+                programme=cohort.programme,
+                email_verified=True,
+                cohort__isnull=True,
+            )
+            students.update(
+                cohort=cohort,
+                coordinator=assignment.coordinator,  # may be None – that is fine
+            )
+    elif cohort.department:
+        # Legacy single-department cohort path (backward compat)
+        StudentProfile.objects.filter(
+            department=cohort.department,
+            programme=cohort.programme,
+            cohort__isnull=True,
+        ).update(cohort=cohort, coordinator=cohort.coordinator)
+
+
+def sync_coordinator_to_students(assignment):
+    """When a coordinator is assigned/updated for a dept in a cohort, update
+    all enrolled students in that department and cohort."""
     StudentProfile.objects.filter(
-        department=cohort.department,
-        programme=cohort.programme,
-        cohort__isnull=True,
-    ).update(cohort=cohort, coordinator=cohort.coordinator)
+        cohort=assignment.cohort,
+        department=assignment.department,
+    ).update(coordinator=assignment.coordinator)
 
 
 def cohort_week_start(cohort, week_no):
@@ -293,13 +325,22 @@ class IsStudent(BasePermission):
 
 # Cohort endpoints
 
+def get_coordinator_cohorts(coordinator):
+    """Return all cohorts where the coordinator has at least one dept assignment,
+    plus legacy cohorts that use the old FK directly."""
+    from django.db.models import Q
+    return Cohort.objects.filter(
+        Q(department_assignments__coordinator=coordinator) | Q(coordinator=coordinator)
+    ).distinct().order_by("-start_date")
+
+
 class CoordinatorCohortView(APIView):
     permission_classes = [IsAuthenticated, IsCoordinator]
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):
         coordinator = get_coordinator(request.user)
-        cohorts = Cohort.objects.filter(coordinator=coordinator).order_by("-start_date")
+        cohorts = get_coordinator_cohorts(coordinator)
         return Response({"results": CohortSerializer(cohorts, many=True).data})
 
 
@@ -309,7 +350,7 @@ class CoordinatorCohortDetailView(APIView):
 
     def patch(self, request, cohort_id):
         coordinator = get_coordinator(request.user)
-        cohort = Cohort.objects.filter(pk=cohort_id, coordinator=coordinator).first()
+        cohort = get_coordinator_cohorts(coordinator).filter(pk=cohort_id).first()
         if not cohort:
             return api_error("not_found", "Cohort was not found.", status.HTTP_404_NOT_FOUND)
 
@@ -351,15 +392,47 @@ class CurrentCohortView(APIView):
             return Response({"server_time": server_time(), "cohort": None})
 
         today = timezone.localdate()
+        has_started = today >= student.cohort.start_date
         days_from_start = (today - student.cohort.start_date).days
-        week_no = min(
-            student.cohort.total_weeks,
-            max(1, (days_from_start + student.cohort.start_date.weekday()) // 7 + 1),
+        days_until_start = (student.cohort.start_date - today).days if not has_started else 0
+
+        week_no = (
+            min(
+                student.cohort.total_weeks,
+                max(1, (days_from_start + student.cohort.start_date.weekday()) // 7 + 1),
+            )
+            if has_started
+            else None
         )
-        day_no = min((student.cohort.end_date - student.cohort.start_date).days + 1, max(1, days_from_start + 1))
+        day_no = (
+            min((student.cohort.end_date - student.cohort.start_date).days + 1, max(1, days_from_start + 1))
+            if has_started
+            else None
+        )
+
+        coordinator_name = None
+        coordinator_email = None
+        if student.coordinator and student.coordinator.user:
+            coordinator_name = f"{student.coordinator.user.first_name} {student.coordinator.user.last_name}".strip()
+            coordinator_email = student.coordinator.user.email
+
+        cohort_data = CohortSerializer(student.cohort).data
+        cohort_data["name"] = student.cohort.name or str(student.cohort)
+        cohort_data["faculty"] = {
+            "id": student.cohort.faculty.id,
+            "name": student.cohort.faculty.name,
+            "code": student.cohort.faculty.code,
+        } if student.cohort.faculty else None
+        cohort_data["department_name"] = student.department.name if student.department else None
+        cohort_data["has_started"] = has_started
+        cohort_data["days_until_start"] = max(0, days_until_start)
+        cohort_data["has_coordinator"] = bool(student.coordinator)
+        cohort_data["coordinator_name"] = coordinator_name
+        cohort_data["coordinator_email"] = coordinator_email
+
         return Response({
             "server_time": server_time(),
-            "cohort": CohortSerializer(student.cohort).data,
+            "cohort": cohort_data,
             "week_number": week_no,
             "day_number": day_no,
         })
@@ -370,56 +443,105 @@ class AdminCohortListView(APIView):
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):
-        cohorts = Cohort.objects.select_related("department", "coordinator__user").order_by("-start_date")
-        return Response({"results": CohortSerializer(cohorts, many=True).data})
+        cohorts = Cohort.objects.prefetch_related(
+            "department_assignments__department",
+            "department_assignments__coordinator__user",
+        ).select_related("faculty", "department", "coordinator__user").order_by("-start_date")
+        return Response({"results": [
+            cohort_list_item(c) for c in cohorts
+        ]})
 
     def post(self, request):
-        """Admin creates a new cohort and assigns a coordinator to it."""
-        department_id = request.data.get("department_id")
-        coordinator_id = request.data.get("coordinator_id")
+        """Admin creates a faculty-wide cohort with one or more participating departments."""
+        faculty_id = request.data.get("faculty_id")
+        dept_ids = request.data.get("department_ids", [])  # list of department PKs
+        custom_name = request.data.get("name", "").strip()
 
-        department = Department.objects.filter(pk=department_id).first()
-        if not department:
-            return api_error("department_not_found", "Department was not found.", status.HTTP_404_NOT_FOUND)
+        faculty = Faculty.objects.filter(pk=faculty_id).first() if faculty_id else None
+        if not faculty:
+            return api_error("faculty_not_found", "Faculty was not found.", status.HTTP_404_NOT_FOUND)
+        if not dept_ids or not isinstance(dept_ids, list):
+            return api_error("departments_required", "Select at least one participating department.")
 
-        coordinator = CoordinatorProfile.objects.select_related("user", "department").filter(
-            pk=coordinator_id
-        ).first()
-        if not coordinator:
-            return api_error("coordinator_not_found", "Coordinator was not found.", status.HTTP_404_NOT_FOUND)
+        departments = list(Department.objects.filter(pk__in=dept_ids, faculty=faculty))
+        if len(departments) != len(dept_ids):
+            return api_error("department_not_found", "One or more departments were not found in the selected faculty.", status.HTTP_404_NOT_FOUND)
 
-        # Build payload for the serializer (department and coordinator set separately)
-        payload = {k: v for k, v in request.data.items() if k not in ("department_id", "coordinator_id")}
+        payload = {k: v for k, v in request.data.items()
+                   if k not in ("faculty_id", "department_ids", "name")}
         serializer = CohortSerializer(data=payload)
         serializer.is_valid(raise_exception=True)
 
-        # Validate programme matches coordinator assignment
-        programme = serializer.validated_data.get("programme")
-        if programme != coordinator.programme:
-            return api_error(
-                "programme_mismatch",
-                f"This coordinator is assigned to {coordinator.programme}, not {programme}."
-            )
-        if coordinator.department_id != department.id:
-            return api_error(
-                "department_mismatch",
-                "This coordinator is not assigned to the selected department."
-            )
-
         with transaction.atomic():
-            cohort = serializer.save(department=department, coordinator=coordinator)
+            cohort = serializer.save(faculty=faculty, name=custom_name or "")
+            # cohort.save() auto-generates name if blank – re-save if custom provided
+            if custom_name:
+                cohort.name = custom_name
+                cohort.save(update_fields=["name"])
+            # Create per-department assignments (no coordinator yet)
+            CohortDepartmentAssignment.objects.bulk_create([
+                CohortDepartmentAssignment(cohort=cohort, department=dept)
+                for dept in departments
+            ])
             assign_students(cohort)
             record_audit(request, "COHORT_CREATED", cohort, {
-                "department_id": department.id,
-                "coordinator_id": coordinator.id,
+                "faculty_id": faculty.id,
+                "department_ids": [d.id for d in departments],
             })
 
-        return Response(CohortSerializer(cohort).data, status=status.HTTP_201_CREATED)
+        return Response(cohort_list_item(cohort), status=status.HTTP_201_CREATED)
+
+
+def cohort_list_item(cohort):
+    """Build a response dict for a cohort listing."""
+    dept_assignments = list(cohort.department_assignments.select_related(
+        "department", "coordinator__user"
+    ).all())
+    # Fallback for legacy cohorts that have no department_assignments
+    if not dept_assignments and cohort.department:
+        departments = [{"id": cohort.department_id, "name": cohort.department.name, "coordinator": (
+            {"id": cohort.coordinator_id, "email": cohort.coordinator.user.email,
+             "name": f"{cohort.coordinator.user.first_name} {cohort.coordinator.user.last_name}".strip()}
+            if cohort.coordinator else None
+        )}]
+    else:
+        departments = [
+            {
+                "id": a.department_id,
+                "name": a.department.name,
+                "coordinator": {
+                    "id": a.coordinator_id,
+                    "email": a.coordinator.user.email,
+                    "name": f"{a.coordinator.user.first_name} {a.coordinator.user.last_name}".strip(),
+                } if a.coordinator else None,
+            }
+            for a in dept_assignments
+        ]
+    return {
+        "id": cohort.pk,
+        "name": cohort.name or str(cohort),
+        "programme": cohort.programme,
+        "session": cohort.session,
+        "faculty": {"id": cohort.faculty_id, "name": cohort.faculty.name, "code": cohort.faculty.code} if cohort.faculty else None,
+        "departments": departments,
+        "start_date": cohort.start_date.isoformat(),
+        "end_date": cohort.end_date.isoformat(),
+        "total_weeks": cohort.total_weeks,
+        "status": cohort.status,
+        "enrolled_students": cohort.students.count(),
+        "created_at": cohort.created_at.isoformat(),
+    }
 
 
 class AdminCohortDetailView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
     authentication_classes = [JWTAuthentication]
+
+    def get(self, request, cohort_id):
+        cohort = Cohort.objects.filter(pk=cohort_id).first()
+        if not cohort:
+            return api_error("not_found", "Cohort was not found.", status.HTTP_404_NOT_FOUND)
+        return Response(cohort_list_item(cohort))
 
     def patch(self, request, cohort_id):
         cohort = Cohort.objects.filter(pk=cohort_id).first()
@@ -439,10 +561,75 @@ class AdminCohortDetailView(APIView):
             serializer.save()
             record_audit(request, "COHORT_UPDATED", cohort)
 
-        return Response(CohortSerializer(cohort).data)
+        return Response(cohort_list_item(cohort))
 
 
 # SWEP attendance endpoints
+
+class AdminCohortDepartmentAssignView(APIView):
+    """Assign or unassign a coordinator to a department within a cohort."""
+    permission_classes = [IsAuthenticated, IsAdmin]
+    authentication_classes = [JWTAuthentication]
+
+    def patch(self, request, cohort_id, department_id):
+        cohort = Cohort.objects.filter(pk=cohort_id).first()
+        if not cohort:
+            return api_error("not_found", "Cohort was not found.", status.HTTP_404_NOT_FOUND)
+
+        assignment = CohortDepartmentAssignment.objects.filter(
+            cohort=cohort, department_id=department_id
+        ).first()
+        if not assignment:
+            return api_error(
+                "department_not_in_cohort",
+                "This department is not part of the cohort.",
+                status.HTTP_404_NOT_FOUND,
+            )
+
+        coordinator_id = request.data.get("coordinator_id")  # None = unassign
+        if coordinator_id is None:
+            # Unassign coordinator from this department
+            assignment.coordinator = None
+            assignment.save(update_fields=["coordinator"])
+            # Remove coordinator from students in this dept+cohort who had this coordinator
+            StudentProfile.objects.filter(
+                cohort=cohort, department_id=department_id
+            ).update(coordinator=None)
+            record_audit(request, "COHORT_DEPT_COORDINATOR_REMOVED", cohort, {
+                "department_id": department_id,
+            })
+            return Response({"cohort_id": cohort_id, "department_id": department_id, "coordinator": None})
+
+        coordinator = CoordinatorProfile.objects.select_related("user").filter(
+            pk=coordinator_id,
+            programme=cohort.programme,
+        ).first()
+        if not coordinator:
+            return api_error(
+                "coordinator_not_found",
+                f"No {cohort.programme} coordinator found with that ID.",
+                status.HTTP_404_NOT_FOUND,
+            )
+
+        with transaction.atomic():
+            assignment.coordinator = coordinator
+            assignment.save(update_fields=["coordinator"])
+            sync_coordinator_to_students(assignment)
+            record_audit(request, "COHORT_DEPT_COORDINATOR_ASSIGNED", cohort, {
+                "department_id": department_id,
+                "coordinator_id": coordinator_id,
+            })
+
+        return Response({
+            "cohort_id": cohort_id,
+            "department_id": department_id,
+            "coordinator": {
+                "id": coordinator.pk,
+                "email": coordinator.user.email,
+                "name": f"{coordinator.user.first_name} {coordinator.user.last_name}".strip(),
+            },
+        })
+
 
 class AttendanceSessionCreateView(APIView):
     permission_classes = [IsAuthenticated, IsCoordinator]
@@ -453,12 +640,26 @@ class AttendanceSessionCreateView(APIView):
         serializer = AttendanceSessionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        cohort = Cohort.objects.filter(
+        today = timezone.localdate()
+        # Find an active SWEP cohort where this coordinator is assigned to at least one department
+        assignment = CohortDepartmentAssignment.objects.select_related("cohort").filter(
             coordinator=coordinator,
-            programme=Programme.SWEP,
-            start_date__lte=timezone.localdate(),
-            end_date__gte=timezone.localdate(),
+            cohort__programme=Programme.SWEP,
+            cohort__start_date__lte=today,
+            cohort__end_date__gte=today,
         ).first()
+        # Also accept legacy cohorts that still use the old coordinator FK
+        if not assignment:
+            legacy_cohort = Cohort.objects.filter(
+                coordinator=coordinator,
+                programme=Programme.SWEP,
+                start_date__lte=today,
+                end_date__gte=today,
+            ).first()
+            cohort = legacy_cohort
+        else:
+            cohort = assignment.cohort
+
         if not cohort:
             return api_error("not_applicable", "An active SWEP cohort is required.", status.HTTP_403_FORBIDDEN)
 
@@ -1126,13 +1327,25 @@ class StudentLogbookPhotoView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def get_coordinator_students(coordinator):
+    """Return all students scoped to this coordinator.
+
+    Includes students assigned via the new CohortDepartmentAssignment model
+    as well as the legacy coordinator FK on StudentProfile.
+    """
+    from django.db.models import Q
+    return StudentProfile.objects.filter(
+        Q(coordinator=coordinator)
+    ).distinct()
+
+
 class CoordinatorStudentListView(APIView):
     permission_classes = [IsAuthenticated, IsCoordinator]
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):
         coordinator = get_coordinator(request.user)
-        students = StudentProfile.objects.select_related("user", "cohort", "supervisor").filter(coordinator=coordinator)
+        students = get_coordinator_students(coordinator).select_related("user", "cohort", "supervisor")
         search = request.query_params.get("q", "").strip()
         if search:
             students = students.filter(Q(matric_no__icontains=search) | Q(user__email__icontains=search))
@@ -1189,7 +1402,7 @@ class CoordinatorDashboardView(APIView):
             status=AttendanceRecord.Status.PRESENT,
         ).count()
 
-        cohorts = Cohort.objects.filter(coordinator=coordinator).order_by("-start_date")
+        cohorts = get_coordinator_cohorts(coordinator)
         cohort = (
             cohorts.filter(start_date__lte=today, end_date__gte=today).first()
             or cohorts.filter(start_date__gt=today).order_by("start_date").first()
@@ -1777,22 +1990,39 @@ class AdminUserListView(APIView):
         search = (request.query_params.get("search") or request.query_params.get("q") or "").strip()
         role = (request.query_params.get("role") or "").upper()
         account_status = request.query_params.get("status")
+        faculty_id = request.query_params.get("faculty_id") or request.query_params.get("faculty")
+        department_id = request.query_params.get("department_id") or request.query_params.get("department")
+
         if search:
             users = users.filter(
                 Q(email__icontains=search)
                 | Q(first_name__icontains=search)
                 | Q(last_name__icontains=search)
+                | Q(studentprofile__matric_no__icontains=search)
             )
         if role in ("STUDENT", "COORDINATOR"):
             users = users.filter(role=role)
-        if account_status:
+        if account_status and account_status != "ALL":
             users = users.filter(status=account_status.upper())
+        if faculty_id:
+            users = users.filter(
+                Q(studentprofile__department__faculty_id=faculty_id)
+                | Q(coordinatorprofile__department__faculty_id=faculty_id)
+            )
+        if department_id:
+            users = users.filter(
+                Q(studentprofile__department_id=department_id)
+                | Q(coordinatorprofile__department_id=department_id)
+            )
         results = []
         for user in users:
             student = get_student(user)
             coordinator = get_coordinator(user)
             profile = student or coordinator
             dp = student.degree_programme if student else None
+            dept = profile.department if profile else None
+            fac = dept.faculty if dept else None
+
             # Student-specific stats
             weeks_submitted = 0
             weeks_reviewed = 0
@@ -1819,7 +2049,11 @@ class AdminUserListView(APIView):
                 "status": user.status,
                 "is_active": user.is_active,
                 "date_joined": user.last_login.isoformat()[:10] if user.last_login else None,
-                "department": profile.department.name if profile else None,
+                "department_id": dept.id if dept else None,
+                "department": dept.name if dept else None,
+                "faculty_id": fac.id if fac else None,
+                "faculty_name": fac.name if fac else None,
+                "faculty_code": fac.code if fac else None,
                 "degree_programme": dp.name if dp else None,
                 "programme": profile.programme if profile else None,
                 "cohort_id": student.cohort_id if student else None,
@@ -1838,14 +2072,22 @@ class AdminUserListView(APIView):
                 "student_profile": {
                     "matric_no": student.matric_no,
                     "programme": student.programme,
-                    "department_name": student.department.name,
+                    "department_id": dept.id if dept else None,
+                    "department_name": dept.name if dept else None,
+                    "faculty_id": fac.id if fac else None,
+                    "faculty_name": fac.name if fac else None,
+                    "faculty_code": fac.code if fac else None,
                     "cohort_id": student.cohort_id,
                     "weeks_submitted": weeks_submitted,
                     "total_weeks": student.cohort.total_weeks if student.cohort else 0,
                     "running_score_avg": running_score_avg,
                 } if student else None,
                 "coordinator_profile": {
-                    "department_name": coordinator.department.name,
+                    "department_id": dept.id if dept else None,
+                    "department_name": dept.name if dept else None,
+                    "faculty_id": fac.id if fac else None,
+                    "faculty_name": fac.name if fac else None,
+                    "faculty_code": fac.code if fac else None,
                     "programme": coordinator.programme,
                     "enrolled_students_count": enrolled_students_count,
                 } if coordinator else None,
@@ -1858,7 +2100,7 @@ class AdminOverviewView(APIView):
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):
-        from backend.auth.models import CoordinatorInvitation
+        from backend.auth.models import CoordinatorInvitation, Faculty
         today = timezone.localdate()
 
         # Submission stats
@@ -1871,6 +2113,34 @@ class AdminOverviewView(APIView):
             deadline_at__lt=timezone.now(),
         ).count()
         submission_rate = round((submitted_weeks / total_weeks) * 100) if total_weeks > 0 else 0
+
+        # Faculty Breakdown
+        faculties = Faculty.objects.prefetch_related("departments").all().order_by("name")
+        faculty_breakdown = []
+        for fac in faculties:
+            depts_data = []
+            fac_student_count = 0
+            fac_coord_count = 0
+            for d in fac.departments.all().order_by("name"):
+                s_count = StudentProfile.objects.filter(department=d).count()
+                c_count = CoordinatorProfile.objects.filter(department=d).count()
+                fac_student_count += s_count
+                fac_coord_count += c_count
+                depts_data.append({
+                    "id": d.id,
+                    "name": d.name,
+                    "students_count": s_count,
+                    "coordinators_count": c_count,
+                })
+            faculty_breakdown.append({
+                "id": fac.id,
+                "name": fac.name,
+                "code": fac.code,
+                "students_count": fac_student_count,
+                "coordinators_count": fac_coord_count,
+                "departments_count": fac.departments.count(),
+                "departments": depts_data,
+            })
 
         return Response({
             "students": StudentProfile.objects.count(),
@@ -1897,6 +2167,7 @@ class AdminOverviewView(APIView):
             "overdue_weeks": overdue_weeks,
             "submission_rate": submission_rate,
             "cohort_completion_rate": submission_rate,
+            "faculty_breakdown": faculty_breakdown,
         })
 
 
@@ -1984,6 +2255,10 @@ class AdminCoordinatorReassignView(APIView):
             Cohort.objects.filter(
                 coordinator=old_coordinator,
                 end_date__gte=timezone.localdate(),
+            ).update(coordinator=new_coordinator)
+            CohortDepartmentAssignment.objects.filter(
+                coordinator=old_coordinator,
+                cohort__end_date__gte=timezone.localdate(),
             ).update(coordinator=new_coordinator)
             old_coordinator.user.status = LogrAccount.Status.DEACTIVATED
             old_coordinator.user.status_reason = "Coordinator reassigned"
@@ -2075,18 +2350,31 @@ class AdminStudentAssignmentView(APIView):
             return api_error("cohort_not_found", "Cohort was not found.", status.HTTP_404_NOT_FOUND)
         if coordinator_id and not coordinator:
             return api_error("coordinator_not_found", "Coordinator was not found.", status.HTTP_404_NOT_FOUND)
-        if cohort and (cohort.department_id != student.department_id or cohort.programme != student.programme):
-            return api_error("assignment_mismatch", "Student department and programme must match the cohort.")
-        if coordinator and (
-            coordinator.department_id != student.department_id
-            or coordinator.programme != student.programme
-        ):
-            return api_error("assignment_mismatch", "Student department and programme must match the coordinator.")
-        if cohort and coordinator and coordinator_id != cohort.coordinator_id:
-            return api_error("assignment_mismatch", "Choose the coordinator assigned to this cohort.")
+        if cohort:
+            if cohort.programme != student.programme:
+                return api_error("assignment_mismatch", "Student programme must match the cohort programme.")
+            dept_in_cohort = (
+                cohort.department_assignments.filter(department=student.department).exists()
+                or cohort.department_id == student.department_id
+            )
+            if not dept_in_cohort:
+                return api_error("assignment_mismatch", "Student's department is not included in this cohort.")
+
+        if coordinator:
+            if coordinator.programme != student.programme:
+                return api_error("assignment_mismatch", "Coordinator programme must match the student programme.")
+
+        # Determine coordinator: explicitly given > department coordinator in cohort > legacy cohort coordinator
+        final_coordinator = coordinator
+        if not final_coordinator and cohort:
+            dept_assign = cohort.department_assignments.filter(department=student.department).first()
+            if dept_assign and dept_assign.coordinator:
+                final_coordinator = dept_assign.coordinator
+            elif cohort.coordinator:
+                final_coordinator = cohort.coordinator
 
         student.cohort = cohort
-        student.coordinator = coordinator or (cohort.coordinator if cohort else None)
+        student.coordinator = final_coordinator
         student.save(update_fields=["cohort", "coordinator"])
         record_audit(request, "STUDENT_ASSIGNMENT_CHANGED", student, {
             "cohort_id": student.cohort_id,
@@ -2109,13 +2397,24 @@ class AdminStudentProgrammeView(APIView):
             return api_error("programme_locked", "Programme cannot change after logbook entries exist.")
 
         student.programme = serializer.validated_data["programme"]
-        cohort = Cohort.objects.filter(
+        # Look up active cohort for this student's department in the new programme
+        assignment = CohortDepartmentAssignment.objects.select_related("cohort", "coordinator").filter(
             department=student.department,
-            programme=student.programme,
-            end_date__gte=timezone.localdate(),
-        ).order_by("start_date").first()
-        student.cohort = cohort
-        student.coordinator = cohort.coordinator if cohort else None
+            cohort__programme=student.programme,
+            cohort__end_date__gte=timezone.localdate(),
+        ).order_by("cohort__start_date").first()
+        if assignment:
+            student.cohort = assignment.cohort
+            student.coordinator = assignment.coordinator
+        else:
+            legacy_cohort = Cohort.objects.filter(
+                department=student.department,
+                programme=student.programme,
+                end_date__gte=timezone.localdate(),
+            ).order_by("start_date").first()
+            student.cohort = legacy_cohort
+            student.coordinator = legacy_cohort.coordinator if legacy_cohort else None
+
         student.save(update_fields=["programme", "cohort", "coordinator"])
         record_audit(request, "STUDENT_PROGRAMME_CHANGED", student, {"programme": student.programme})
         return Response({"student_id": student.pk, "programme": student.programme, "cohort_id": student.cohort_id})

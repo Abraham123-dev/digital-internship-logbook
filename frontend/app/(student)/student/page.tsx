@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Star, User, LogOut, ChevronRight,
   ChevronDown, ChevronUp, PenLine, AlertCircle, Menu,
   X, Lock, Clock, GraduationCap, Briefcase, Info,
-  ShieldCheck, Inbox
+  ShieldCheck, ShieldAlert, Inbox
 } from "lucide-react";
 import {
   studentApi,
@@ -290,7 +290,15 @@ function ProgrammeSessionCard({
   }
 
   // Matched State
-  const isUpcoming = cohort.status === "UPCOMING";
+  const hasStarted = cohort.has_started ?? (cohort.status === "ACTIVE");
+  const isUpcoming = !hasStarted || cohort.status === "UPCOMING";
+  const hasCoordinator = Boolean(cohort.has_coordinator || cohort.coordinator_name || cohort.coordinator);
+  const coordinatorDisplay = cohort.coordinator_name
+    ? `${cohort.coordinator_name} (${cohort.coordinator_email || ""})`
+    : cohort.coordinator
+    ? cohort.coordinator
+    : null;
+
   const startDateStr = new Date(cohort.start_date + "T00:00:00").toLocaleDateString("en-NG", {
     day: "numeric",
     month: "short",
@@ -316,19 +324,32 @@ function ProgrammeSessionCard({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-[14px] font-bold text-[#141414]">{cohort.programme} &middot; {cohort.session} Session</h2>
+              <h2 className="text-[14px] font-bold text-[#141414]">
+                {cohort.name || `${cohort.programme} · ${cohort.session} Session`}
+              </h2>
               <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                 isUpcoming
                   ? "bg-blue-50 text-blue-700 border-blue-200"
                   : "bg-emerald-50 text-emerald-700 border-emerald-200"
               }`}>
                 <CheckCircle2 className="size-2.5" />
-                {isUpcoming ? "Scheduled & Upcoming" : "Matched & Active"}
+                {isUpcoming ? "Scheduled & Upcoming" : "Active Session"}
               </span>
             </div>
-            <p className="text-[11px] text-[#7A7973]">
-              {cohort.department} &middot; Coordinator: {cohort.coordinator}
-            </p>
+            <div className="flex items-center gap-2 text-[11px] text-[#7A7973] flex-wrap mt-0.5">
+              <span>{cohort.department_name || cohort.department}</span>
+              <span>&bull;</span>
+              {hasCoordinator ? (
+                <span className="text-[#141414] font-medium">
+                  Coordinator: {coordinatorDisplay}
+                </span>
+              ) : (
+                <span className="text-amber-800 font-medium inline-flex items-center gap-1">
+                  <ShieldAlert className="size-3 text-amber-600" />
+                  Coordinator pending assignment
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -340,6 +361,34 @@ function ProgrammeSessionCard({
           {expandedGuidelines ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
         </button>
       </div>
+
+      {/* Coordinator Pending Notice */}
+      {!hasCoordinator && (
+        <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-2.5 text-[11.5px] text-amber-900 leading-relaxed">
+          <AlertCircle className="size-4 text-amber-700 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-semibold text-amber-950">Coordinator Pending Assignment</p>
+            <p className="text-amber-800">
+              An administrator will assign your department coordinator shortly. You are officially enrolled in the cohort and can review the schedule and requirements below.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Cohort Starting Soon Notice */}
+      {isUpcoming && (
+        <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/80 flex items-start gap-2.5 text-[11.5px] text-blue-900 leading-relaxed">
+          <Calendar className="size-4 text-blue-700 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-semibold text-blue-950">
+              Session Commences on {startDateStr} {cohort.days_until_start ? `(in ${cohort.days_until_start} day${cohort.days_until_start > 1 ? 's' : ''})` : ""}
+            </p>
+            <p className="text-blue-800">
+              Daily logbook documentation and submissions will officially open once the cohort begins on {startDateStr}.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Programme Metadata Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -517,13 +566,20 @@ export default function StudentDashboardPage() {
 
           <div className="flex items-center gap-3">
             {isMatched && (
-              <Link
-                href={todayEntryHref}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#141414] text-white text-[12px] font-semibold hover:bg-[#282828] transition-colors shadow-xs"
-              >
-                <PenLine className="size-3.5" />
-                <span>Write today&apos;s log</span>
-              </Link>
+              cohort?.has_started !== false ? (
+                <Link
+                  href={todayEntryHref}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#141414] text-white text-[12px] font-semibold hover:bg-[#282828] transition-colors shadow-xs"
+                >
+                  <PenLine className="size-3.5" />
+                  <span>Write today&apos;s log</span>
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#F0EFEA] border border-[#D5D4CD] text-[#7A7973] text-[11.5px] font-medium">
+                  <Calendar className="size-3.5" />
+                  <span>Opens on {cohort?.start_date ? new Date(cohort.start_date + "T00:00:00").toLocaleDateString("en-NG", { day: "numeric", month: "short" }) : "start date"}</span>
+                </span>
+              )
             )}
           </div>
         </header>

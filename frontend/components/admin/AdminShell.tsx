@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Mail, Settings, Shield,
-  FileSpreadsheet, History, LogOut, Menu, X, ArrowUpRight
+  FileSpreadsheet, History, LogOut, Menu, X, ArrowUpRight,
+  Layers
 } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
 
@@ -33,10 +34,9 @@ export function AdminShell({
 
   const navItems: NavItem[] = [
     { label: "Overview",       href: "/admin",              icon: <LayoutDashboard className="size-4" /> },
+    { label: "Cohorts",        href: "/admin/cohorts",      icon: <Layers className="size-4" /> },
     { label: "Students",       href: "/admin/students",     icon: <Users className="size-4" /> },
     { label: "Coordinators",   href: "/admin/coordinators", icon: <Shield className="size-4" /> },
-    { label: "Invitations",    href: "/admin/invitations",  icon: <Mail className="size-4" /> },
-    { label: "Cohorts",        href: "/admin/cohorts",      icon: <Settings className="size-4" /> },
     { label: "Reports",        href: "/admin/reports",      icon: <FileSpreadsheet className="size-4" /> },
     { label: "Audit Log",      href: "/admin/audit",        icon: <History className="size-4" /> },
   ];
@@ -95,7 +95,8 @@ export function AdminShell({
           {navItems.map((item) => {
             const active =
               pathname === item.href ||
-              (item.href !== "/admin" && pathname.startsWith(item.href));
+              (item.href !== "/admin" && pathname.startsWith(item.href)) ||
+              (item.href === "/admin/coordinators" && pathname.startsWith("/admin/invitations"));
 
             return (
               <Link

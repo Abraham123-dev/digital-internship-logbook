@@ -13,6 +13,7 @@ urlpatterns = [
     path("cohorts/current/", views.CurrentCohortView.as_view()),
     path("admin/cohorts/", views.AdminCohortListView.as_view()),
     path("admin/cohorts/<int:cohort_id>/", views.AdminCohortDetailView.as_view()),
+    path("admin/cohorts/<int:cohort_id>/departments/<int:department_id>/coordinator/", views.AdminCohortDepartmentAssignView.as_view()),
 
     path("coordinator/attendance/sessions/", views.AttendanceSessionCreateView.as_view()),
     path("coordinator/attendance/sessions/current/", views.CurrentAttendanceSessionView.as_view()),

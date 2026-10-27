@@ -6,7 +6,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from backend.auth.models import CoordinatorProfile, Department, Programme, StudentProfile
+from backend.auth.models import CoordinatorProfile, Department, Faculty, Programme, StudentProfile
 
 
 def default_working_days():
@@ -18,10 +18,23 @@ def supervisor_token_expiry():
 
 
 class Cohort(models.Model):
-    """A programme run for one department and one academic session."""
+    """A programme run for a faculty across one or more departments."""
 
-    department = models.ForeignKey(Department, on_delete=models.PROTECT)
-    coordinator = models.ForeignKey(CoordinatorProfile, on_delete=models.PROTECT)
+    # Faculty-level metadata (new)
+    name = models.CharField(max_length=200, blank=True)  # auto-generated or custom
+    faculty = models.ForeignKey(
+        Faculty, null=True, blank=True, on_delete=models.PROTECT, related_name="cohorts"
+    )
+
+    # Legacy single-department fields — kept nullable for backward compat.
+    # For new cohorts use CohortDepartmentAssignment instead.
+    department = models.ForeignKey(
+        Department, null=True, blank=True, on_delete=models.PROTECT
+    )
+    coordinator = models.ForeignKey(
+        CoordinatorProfile, null=True, blank=True, on_delete=models.PROTECT
+    )
+
     programme = models.CharField(max_length=10, choices=Programme.choices)
     session = models.CharField(max_length=20)
     start_date = models.DateField()
@@ -53,8 +66,42 @@ class Cohort(models.Model):
         days = (self.end_date - self.start_date).days + 1
         return (days + self.start_date.weekday() - 1) // 7 + 1
 
+    def generate_default_name(self):
+        """Build a name like 'SWEP 2026/2027 - FCSE'. Requires faculty to be set."""
+        faculty_code = self.faculty.code if self.faculty else "?"
+        return f"{self.programme} {self.session} - {faculty_code}"
+
+    def save(self, *args, **kwargs):
+        if not self.name and self.faculty:
+            self.name = self.generate_default_name()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.department.name} {self.programme} {self.session}"
+        return self.name or f"{self.programme} {self.session}"
+
+
+class CohortDepartmentAssignment(models.Model):
+    """Maps a department (and optionally a coordinator) to a faculty-wide cohort."""
+
+    cohort = models.ForeignKey(
+        Cohort, on_delete=models.CASCADE, related_name="department_assignments"
+    )
+    department = models.ForeignKey(
+        Department, on_delete=models.PROTECT, related_name="cohort_assignments"
+    )
+    coordinator = models.ForeignKey(
+        CoordinatorProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="cohort_assignments",
+    )
+
+    class Meta:
+        unique_together = [("cohort", "department")]
+
+    def __str__(self):
+        return f"{self.cohort} / {self.department.name}"
 
 
 class CohortHoliday(models.Model):
