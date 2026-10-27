@@ -128,6 +128,10 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
   const [rating, setRating] = useState<number | undefined>(undefined);
   const [comment, setComment] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -142,6 +146,7 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
         setStatus(res.data.status || "draft");
         setRating(res.data.rating);
         setComment(res.data.coordinatorComment);
+        setPhotos(res.data.photos || []);
       }
       setLoading(false);
     }
@@ -172,6 +177,35 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
   }
 
   const isReadOnly = ["submitted", "reviewed"].includes(status);
+
+  async function handlePhoto(file: File) {
+    if (uploading || isReadOnly) return;
+    setPhotoError(null);
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setPhotoError("Choose a PNG, JPEG, or WebP image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError("Each photo must be 5 MB or smaller.");
+      return;
+    }
+    setUploading(true);
+    try {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      setSaveState("saving");
+      const saved = await studentApi.saveDay(rawDate, { activities, skills, reflection, isDraft: true });
+      setSaveState(saved.ok ? "saved" : "error");
+      if (!saved.ok) {
+        setPhotoError(saved.message);
+        return;
+      }
+      const res = await studentApi.uploadDayPhoto(rawDate, file);
+      if (res.ok) setPhotos((current) => [...current, res.data.url]);
+      else setPhotoError(res.message);
+    } finally {
+      setUploading(false);
+    }
+  }
   const prevDate = getAdjacentDate(rawDate, -1);
   const nextDate = getAdjacentDate(rawDate, 1);
 
@@ -284,21 +318,48 @@ export default function StudentDayPage({ params }: { params: Promise<{ date: str
             {/* Photo Section */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-medium text-[#5A5954] uppercase tracking-wider">
-                Photos & Diagrams <span className="text-[#9A9990] font-normal">— Optional, up to 3</span>
+                Photos & Diagrams <span className="text-[#9A9990] font-normal">— Optional, up to 5</span>
               </label>
               <div className="flex items-center gap-3 pt-1">
                 <button
                   type="button"
-                  disabled={isReadOnly}
+                  disabled={isReadOnly || uploading || photos.length >= 5}
+                  onClick={() => fileInputRef.current?.click()}
                   className="size-20 rounded-xl border border-dashed border-[#D8D7CE] hover:border-[#141414] text-[#7A7973] hover:text-[#141414] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Camera className="size-4" />
-                  <span className="text-[10px] font-medium">Add</span>
+                  <span className="text-[10px] font-medium">{uploading ? "Uploading…" : "Add"}</span>
                 </button>
                 <p className="text-[11px] text-[#9A9990]">
                   Attach photos of equipment, circuits, or schematics from workshop sessions.
                 </p>
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                aria-label="Upload logbook photo"
+                className="hidden"
+                disabled={isReadOnly || uploading || photos.length >= 5}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) void handlePhoto(file);
+                }}
+              />
+              <p className="text-[11px] text-[#9A9990]">PNG, JPEG, or WebP, up to 5 MB each. {photos.length}/5 photos.</p>
+              {photoError && <p role="alert" className="text-[12px] text-red-600">{photoError}</p>}
+              {photos.length > 0 && (
+                <div className="flex flex-wrap gap-3">
+                  {photos.map((url, index) => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer">
+                      {/* Signed private URLs are provided directly by the backend. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Logbook photo ${index + 1}`} className="size-24 rounded-xl border border-[#E8E7E1] object-cover" />
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
 
             <FormField

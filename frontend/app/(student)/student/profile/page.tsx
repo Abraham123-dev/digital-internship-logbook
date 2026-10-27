@@ -82,7 +82,7 @@ export default function StudentProfilePage() {
     programme: "SWEP",
     department: "—",
     email: "—",
-    coordinator: "Assigned upon session launch",
+    coordinator: "Loading…",
     session: "Pending announcement",
   });
 
@@ -96,10 +96,13 @@ export default function StudentProfilePage() {
 
         if (profRes.ok && profRes.data?.profile) {
           const p = profRes.data.profile;
-          const dept = typeof p.department === "string" ? p.department : (p.department as any)?.name || "Department pending";
-          const coordinator = cohortRes.ok && cohortRes.data?.cohort?.coordinator
-            ? cohortRes.data.cohort.coordinator
-            : "Assigned upon session launch";
+          const dept = typeof p.department === "string" ? p.department : p.department?.name || "Department pending";
+          const cohort = cohortRes.ok ? cohortRes.data?.cohort : null;
+          const coordinator = cohortRes.ok
+            ? cohort?.coordinator_name
+              ? `${cohort.coordinator_name}${cohort.coordinator_email ? ` (${cohort.coordinator_email})` : ""}`
+              : cohort?.coordinator || cohort?.coordinator_email || "Not yet assigned"
+            : "Unable to load coordinator";
           const session = cohortRes.ok && cohortRes.data?.cohort?.session
             ? cohortRes.data.cohort.session
             : "Pending cohort launch";

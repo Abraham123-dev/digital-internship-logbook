@@ -540,6 +540,12 @@ export const studentApi = {
     };
   },
 
+  uploadDayPhoto(date: string, file: File): Promise<ApiResult<{ id: number; url: string }>> {
+    const data = new FormData();
+    data.append("photo", file);
+    return api.post(`/student/logbook/days/${date}/photos/`, data);
+  },
+
   /** Save or update a day entry */
   async saveDay(date: string, payload: SaveDayPayload): Promise<ApiResult<{ message: string; date: string }>> {
     const res = await api.put<{ updatedAt: string; ready: boolean; canSubmit: boolean }>(

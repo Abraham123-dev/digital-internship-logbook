@@ -91,6 +91,20 @@ export default function AdminCohortsPage() {
     total_weeks: 12,
   });
 
+  function updateCohortDate(field: "start_date" | "end_date", value: string) {
+    setFormData((previous) => {
+      const next = { ...previous, [field]: value };
+      const start = Date.parse(`${next.start_date}T00:00:00Z`);
+      const end = Date.parse(`${next.end_date}T00:00:00Z`);
+      if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+        // Match the backend's Monday-based calendar weeks, including partial weeks.
+        const startWeekday = (new Date(start).getUTCDay() + 6) % 7;
+        next.total_weeks = Math.floor(((end - start) / 86_400_000 + startWeekday) / 7) + 1;
+      }
+      return next;
+    });
+  }
+
   async function loadData() {
     setLoading(true);
     const [cohortsRes, pendingRes, coordsRes, facRes, deptsRes, invitesRes] =
@@ -881,7 +895,7 @@ export default function AdminCohortsPage() {
                     <input
                       type="date"
                       value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      onChange={(e) => updateCohortDate("start_date", e.target.value)}
                       className="w-full h-9.5 px-2.5 rounded-md border border-[#D5D4CE] bg-white text-[12.5px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                     />
                   </div>
@@ -893,7 +907,7 @@ export default function AdminCohortsPage() {
                     <input
                       type="date"
                       value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      onChange={(e) => updateCohortDate("end_date", e.target.value)}
                       className="w-full h-9.5 px-2.5 rounded-md border border-[#D5D4CE] bg-white text-[12.5px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                     />
                   </div>

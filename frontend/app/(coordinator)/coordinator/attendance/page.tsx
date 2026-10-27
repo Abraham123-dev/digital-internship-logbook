@@ -15,6 +15,8 @@ export default function CoordinatorAttendancePage() {
   const [session, setSession] = useState<AttendanceSession | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [codeActive, setCodeActive] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Override modal
   const [overrideModal, setOverrideModal] = useState<{
@@ -35,6 +37,7 @@ export default function CoordinatorAttendancePage() {
         setCodeActive(isActive);
         setTimeLeft(res.data.secondsLeft ?? 0);
       } else {
+        if (!res.ok) setErrorMsg(res.message);
         setSession({
           id: 0,
           code: "",
@@ -75,15 +78,29 @@ export default function CoordinatorAttendancePage() {
   const timeFormatted = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
 
   async function handleGenerateNewCode(duration: number) {
+    if (generating) return;
+    setGenerating(true);
+    setErrorMsg(null);
     const res = await coordinatorApi.generateAttendanceCode(duration);
+    setGenerating(false);
+    if (!res.ok) {
+      setErrorMsg(Object.values(res.errors ?? {}).flat().join(" ") || res.message);
+      return;
+    }
     if (res.ok && session) {
+      const secondsLeft = Math.max(0, Math.ceil(
+        (new Date(res.data.expires_at).getTime() - Date.now()) / 1000,
+      ));
       setSession({
         ...session,
+        id: res.data.id,
         code: res.data.code,
-        active: true,
+        active: secondsLeft > 0,
+        secondsLeft,
+        expiresAt: res.data.expires_at,
       });
-      setTimeLeft(duration * 60);
-      setCodeActive(true);
+      setTimeLeft(secondsLeft);
+      setCodeActive(secondsLeft > 0);
     }
   }
 
@@ -121,6 +138,12 @@ export default function CoordinatorAttendancePage() {
             <span>Overview</span>
           </Link>
         </div>
+
+        {errorMsg && (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700">
+            {errorMsg}
+          </div>
+        )}
 
         {loading || !session ? (
           <AttendanceSkeleton />
@@ -172,22 +195,25 @@ export default function CoordinatorAttendancePage() {
                   </p>
                   <div className="flex gap-2 justify-center pt-1">
                     <button
+                      disabled={generating}
                       onClick={() => handleGenerateNewCode(1)}
                       className="px-3.5 py-1.5 rounded-full border border-[#D8D7CE] text-[11px] font-semibold text-[#141414] hover:bg-white cursor-pointer"
                     >
                       1-minute code
                     </button>
                     <button
+                      disabled={generating}
                       onClick={() => handleGenerateNewCode(2)}
                       className="px-3.5 py-1.5 rounded-full border border-[#D8D7CE] text-[11px] font-semibold text-[#141414] hover:bg-white cursor-pointer"
                     >
                       2-minute code
                     </button>
                     <button
+                      disabled={generating}
                       onClick={() => handleGenerateNewCode(3)}
                       className="px-4 py-1.5 rounded-full bg-[#141414] text-white text-[11px] font-semibold hover:bg-[#282828] shadow-xs cursor-pointer"
                     >
-                      Generate 3-minute code
+                      {generating ? "Generating…" : "Generate 3-minute code"}
                     </button>
                   </div>
                 </div>

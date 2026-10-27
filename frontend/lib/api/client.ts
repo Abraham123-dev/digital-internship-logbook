@@ -163,6 +163,9 @@ interface RequestOptions extends Omit<RequestInit, "body"> {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
   const { body, headers, public: isPublic, ...rest } = options;
+  const isMultipart = typeof FormData !== "undefined" && body instanceof FormData;
+  const contentHeaders: Record<string, string> = isMultipart ? {} : { "Content-Type": "application/json" };
+  const requestBody = isMultipart ? body : body != null ? JSON.stringify(body) : undefined;
 
   const authHeader: Record<string, string> = {};
   if (!isPublic) {
@@ -173,8 +176,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<A
   try {
     const res = await fetch(`${BASE}${path}`, {
       ...rest,
-      headers: { "Content-Type": "application/json", ...authHeader, ...headers },
-      body: body != null ? JSON.stringify(body) : undefined,
+      headers: { ...contentHeaders, ...authHeader, ...headers },
+      body: requestBody,
     });
 
     if (res.status === 204) return { ok: true, data: undefined as T };
@@ -193,11 +196,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<A
         const retryRes = await fetch(`${BASE}${path}`, {
           ...rest,
           headers: {
-            "Content-Type": "application/json",
+            ...contentHeaders,
             ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}),
             ...headers,
           },
-          body: body != null ? JSON.stringify(body) : undefined,
+          body: requestBody,
         });
 
         if (retryRes.status === 204) return { ok: true, data: undefined as T };
