@@ -15,7 +15,8 @@ const PROTECTED: Array<{ prefix: string; role: Role }> = [
   { prefix: "/admin", role: "admin" },
 ];
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/accept-invite"];
+// Invitation links must remain accessible even when another account is signed in.
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password"];
 
 function decodeJwtRole(token?: string): Role | null {
   if (!token) return null;
