@@ -25,7 +25,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-load_dotenv()
+# Load environment variables across common locations (.env, .env.local in root or backend)
+for env_candidate in [
+    BASE_DIR / "backend" / ".env.local",
+    BASE_DIR / "backend" / ".env",
+    BASE_DIR / ".env.local",
+    BASE_DIR / ".env",
+    Path.cwd() / ".env.local",
+    Path.cwd() / ".env",
+]:
+    if env_candidate.is_file():
+        load_dotenv(env_candidate, override=False)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-logr-dev-secret-key-change-in-production")
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -36,14 +46,24 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
-#get the frontend URL
-FRONTEND_URL = (
-    os.getenv("FRONTEND_URL") or "http://localhost:3000"
-).rstrip("/")
+# Parse frontend URLs and origins safely (handles comma-separated lists and trailing slashes)
+raw_frontend_urls = os.getenv("FRONTEND_URL", "http://localhost:3000")
+frontend_origins = set()
+for url in raw_frontend_urls.split(","):
+    clean_url = url.strip().rstrip("/")
+    if clean_url:
+        parts = urlsplit(clean_url)
+        if parts.scheme and parts.netloc:
+            frontend_origins.add(f"{parts.scheme}://{parts.netloc}")
 
-frontend_url_parts = urlsplit(FRONTEND_URL)
+# Always allow standard local frontend origins
+frontend_origins.add("http://localhost:3000")
+frontend_origins.add("http://127.0.0.1:3000")
 
-FRONTEND_ORIGIN = f"{frontend_url_parts.scheme}://{frontend_url_parts.netloc}"
+# Primary frontend URL for single-URL uses (e.g. email links)
+first_frontend = raw_frontend_urls.split(",")[0].strip().rstrip("/")
+FRONTEND_URL = first_frontend if first_frontend else "http://localhost:3000"
+FRONTEND_ORIGIN = sorted(list(frontend_origins))[0]
 
 
 # Application definition
@@ -73,9 +93,9 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [FRONTEND_ORIGIN]
+CORS_ALLOWED_ORIGINS = sorted(list(frontend_origins))
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = [FRONTEND_ORIGIN]
+CSRF_TRUSTED_ORIGINS = sorted(list(frontend_origins))
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
