@@ -270,19 +270,23 @@ export const adminApi = {
     if (!res.ok) return res as any;
     const users = res.data.results || [];
     const pageSize = params?.pageSize ?? 5;
-    const mapped: AdminCoordinatorItem[] = users.map((u) => ({
-      id: u.id,
-      name: `${u.first_name} ${u.last_name}`.trim() || u.email.split("@")[0],
-      email: u.email,
-      department: u.coordinator_profile?.department_name || "—",
-      programme: u.coordinator_profile?.programme || "—",
-      staffId: u.coordinator_profile?.staff_id || "—",
-      assignedStudents: u.coordinator_profile?.enrolled_students_count ?? 0,
-      enrolledStudentsCount: u.coordinator_profile?.enrolled_students_count ?? 0,
-      status: u.is_active ? "ACTIVE" : "INACTIVE",
-      joinedDate: u.date_joined || new Date().toISOString().slice(0, 10),
-      joinedAt: u.date_joined || new Date().toISOString().slice(0, 10),
-    }));
+    const mapped: AdminCoordinatorItem[] = users.map((u: any) => {
+      const fullName = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
+      const profile = u.coordinator_profile || {};
+      return {
+        id: u.id,
+        name: fullName || u.name || (u.email ? u.email.split("@")[0] : "Coordinator"),
+        email: u.email || "",
+        department: profile.department_name || u.department || "—",
+        programme: profile.programme || u.programme || "—",
+        staffId: profile.staff_id || u.staff_id || "—",
+        assignedStudents: profile.enrolled_students_count ?? u.enrolled_students_count ?? 0,
+        enrolledStudentsCount: profile.enrolled_students_count ?? u.enrolled_students_count ?? 0,
+        status: (u.status === "INACTIVE" || u.is_active === false) ? "INACTIVE" : "ACTIVE",
+        joinedDate: u.date_joined || new Date().toISOString().slice(0, 10),
+        joinedAt: u.date_joined || new Date().toISOString().slice(0, 10),
+      };
+    });
     return {
       ok: true,
       data: {
@@ -303,20 +307,24 @@ export const adminApi = {
     if (!res.ok) return res as any;
     const users = res.data.results || [];
     const pageSize = params?.pageSize ?? 5;
-    const mapped: AdminStudentItem[] = users.map((u) => ({
-      id: u.id,
-      name: `${u.first_name} ${u.last_name}`.trim() || u.email.split("@")[0],
-      matricNo: u.student_profile?.matric_no || "—",
-      email: u.email,
-      department: u.student_profile?.department_name || "—",
-      programme: u.student_profile?.programme || "—",
-      coordinatorName: undefined,
-      status: u.is_active ? "ACTIVE" : "DEACTIVATED",
-      weeksSubmitted: u.student_profile?.weeks_submitted ?? 0,
-      totalWeeks: u.student_profile?.total_weeks ?? 0,
-      runningScoreAvg: u.student_profile?.running_score_avg ?? 0,
-      joinedDate: u.date_joined || new Date().toISOString().slice(0, 10),
-    }));
+    const mapped: AdminStudentItem[] = users.map((u: any) => {
+      const fullName = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
+      const profile = u.student_profile || {};
+      return {
+        id: u.id,
+        name: fullName || u.name || (u.email ? u.email.split("@")[0] : "Student"),
+        matricNo: profile.matric_no || u.matric_no || u.matricNo || "—",
+        email: u.email || "",
+        department: profile.department_name || u.department || "—",
+        programme: profile.programme || u.programme || "—",
+        coordinatorName: u.coordinator_name || profile.coordinator_name || "—",
+        status: (u.status === "DEACTIVATED" || u.is_active === false) ? "DEACTIVATED" : "ACTIVE",
+        weeksSubmitted: profile.weeks_submitted ?? u.weeks_submitted ?? 0,
+        totalWeeks: profile.total_weeks ?? u.total_weeks ?? 0,
+        runningScoreAvg: profile.running_score_avg ?? u.running_score_avg ?? 0,
+        joinedDate: u.date_joined || new Date().toISOString().slice(0, 10),
+      };
+    });
     return {
       ok: true,
       data: {
