@@ -348,3 +348,19 @@ Every admin route requires a superuser access token.
 | `GET /admin/audit-logs/` | Latest 200 events; optional `actor`, `action`, `date_from`, `date_to` filters. | `{ "results": [...] }` |
 
 Admin errors include `not_found`, `assignment_mismatch`, `programme_locked`, `already_reviewed`, `cohort_not_found`, `delete_confirmation_required`, and `account_in_use`. Status changes preserve user records; hard deletion is available only through the separately confirmed endpoint above.
+
+
+## Training levels, invitation email cards, and attendance updates
+
+- Student signup, coordinator invitations, and cohort creation accept `level` as a number. SWEP always uses `200`; SIWES requires `300` or `400`. Omitting a SIWES level returns a field validation error. Read responses include `level` for cohorts, invitations, and profiles.
+- Automatic enrolment matches department, programme, and level. Coordinator invitations assign the accepted coordinator only to matching-level cohorts. Manual assignment and coordinator replacement also enforce matching levels.
+- Existing SWEP records are migrated to 200L. Existing SIWES levels remain unset because the old records do not distinguish 300L from 400L. Set the correct levels on existing SIWES cohorts, student profiles, coordinator profiles, and pending invitations in Django Admin. Existing assignments are preserved; unclassified SIWES students are not automatically enrolled. After classification, an unassigned verified student is matched at the next login or when a matching cohort is created.
+- `GET /student/attendance/history/` now includes `checked_in_today`, calculated using the backend's local date. Present and excused students do not need another code that day. Both the dashboard and attendance page use this flag.
+- `GET /coordinator/attendance/sessions/current/` includes `total_students` and a `records` roster with `studentId`, `studentName`, `matricNo`, `status`, and `reason`. Counts and roster cover the coordinator's enrolled students in that cohort. While a session is active the page refreshes every five seconds.
+- Emails are multipart plain text plus HTML. The shared card uses Logr orange, charcoal, warm neutral backgrounds, and Plus Jakarta Sans with an Arial fallback. HTML renders action links as named buttons; the plain text alternative retains links for email clients that cannot show HTML.
+
+Apply the new schema migrations before running this version:
+
+```powershell
+python manage.py migrate
+```

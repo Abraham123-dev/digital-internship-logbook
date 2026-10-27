@@ -603,7 +603,7 @@ export default function StudentDashboardPage() {
               )}
 
               {/* Active Attendance Alert Banner (Only for SWEP when attendance session is active) */}
-              {isMatched && programme === "SWEP" && (
+              {isMatched && programme === "SWEP" && !dashboard?.checkedInToday && (
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 p-4 rounded-2xl bg-white border border-[#E8E7E1] shadow-xs">
                   <div className="flex items-center gap-3">
                     <span className="size-2 rounded-full bg-[#F04D23] animate-pulse shrink-0" />

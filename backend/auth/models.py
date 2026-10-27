@@ -119,6 +119,7 @@ class StudentProfile(models.Model):
         related_name="students",
     )
     programme = models.CharField(max_length=10, choices=Programme.choices)
+    level = models.PositiveSmallIntegerField(choices=[(200, "200L"), (300, "300L"), (400, "400L")], null=True, blank=True)
     email_verified = models.BooleanField(default=False)
 
     objects = models.Manager()
@@ -148,6 +149,7 @@ class CoordinatorProfile(models.Model):
     phone = models.CharField(max_length=20)
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
     programme = models.CharField(max_length=10, choices=Programme.choices)
+    level = models.PositiveSmallIntegerField(choices=[(200, "200L"), (300, "300L"), (400, "400L")], null=True, blank=True)
     objects = models.Manager()
 
     def __str__(self):
@@ -164,6 +166,7 @@ class CoordinatorInvitation(models.Model):
     email = models.EmailField()
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
     programme = models.CharField(max_length=10, choices=Programme.choices)
+    level = models.PositiveSmallIntegerField(choices=[(200, "200L"), (300, "300L"), (400, "400L")], null=True, blank=True)
     token = models.CharField(max_length=100, unique=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)

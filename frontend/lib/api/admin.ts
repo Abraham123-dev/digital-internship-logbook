@@ -14,6 +14,7 @@ export interface AdminUser {
   student_profile?: {
     matric_no: string;
     programme: string;
+  level?: number | null;
     department_name: string;
     cohort_id?: number;
     weeks_submitted?: number;
@@ -24,6 +25,7 @@ export interface AdminUser {
     staff_id?: string;
     department_name: string;
     programme: string;
+  level?: number | null;
     enrolled_students_count?: number;
   };
 }
@@ -88,6 +90,7 @@ export interface AdminCohortItem {
   academicYear: string;
   session?: string;
   programme: string;
+  level?: number | null;
   faculty?: {
     id: number;
     name: string;
@@ -115,6 +118,7 @@ export interface CreateCohortPayload {
   department_ids?: number[];
   session: string;
   programme: "SWEP" | "SIWES";
+  level?: number | null;
   start_date: string;
   end_date: string;
   total_weeks?: number;
@@ -136,6 +140,7 @@ export interface PendingStudentItem {
   department: string;
   degree_programme?: string | null;
   programme: string;
+  level?: number | null;
 }
 
 export interface AdminCoordinatorItem {
@@ -144,6 +149,7 @@ export interface AdminCoordinatorItem {
   email: string;
   department: string;
   programme: string;
+  level?: number | null;
   staffId?: string;
   assignedStudents: number;
   enrolledStudentsCount?: number;
@@ -163,6 +169,7 @@ export interface AdminStudentItem {
   facultyName?: string;
   facultyCode?: string;
   programme: string;
+  level?: number | null;
   coordinatorName?: string;
   status: "ACTIVE" | "DEACTIVATED" | "GRADUATED";
   weeksSubmitted: number;
@@ -175,6 +182,7 @@ export interface DepartmentReportItem {
   id: number;
   department: string;
   programme: string;
+  level?: number | null;
   enrolledStudents: number;
   submissionRate: number;
   missedWeeks: number;
@@ -299,6 +307,7 @@ export const adminApi = {
         academicYear: c.session || "",
         session: c.session,
         programme: c.programme || "SWEP",
+        level: c.level,
         faculty: c.faculty || null,
         departments: depts,
         departmentsCount: depts.length || (c.department ? 1 : 0),
@@ -350,6 +359,7 @@ export const adminApi = {
         email: u.email || "",
         department: profile.department_name || u.department || "—",
         programme: profile.programme || u.programme || "—",
+        level: profile.level ?? u.level,
         staffId: profile.staff_id || u.staff_id || "—",
         assignedStudents: profile.enrolled_students_count ?? u.enrolled_students_count ?? 0,
         enrolledStudentsCount: profile.enrolled_students_count ?? u.enrolled_students_count ?? 0,

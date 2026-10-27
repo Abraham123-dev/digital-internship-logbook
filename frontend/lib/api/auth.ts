@@ -14,6 +14,7 @@ export interface StudentSignupPayload {
   department_id: number;
   degree_programme_id?: number | null;
   programme: "SWEP" | "SIWES";
+  level?: number | null;
   password: string;
 }
 export interface SignupInitResponse { message: string; email: string }
@@ -25,7 +26,7 @@ export interface ForgotPasswordPayload { email: string }
 export interface ResetPasswordPayload  { email: string; token: string; password: string }
 
 export interface ValidateInviteResponse {
-  email: string; department: string; programme: string; expires_at: string;
+  email: string; department: string; programme: string; level?: number | null; expires_at: string;
 }
 export interface AcceptInvitePayload {
   token: string; first_name: string; last_name: string; phone: string; password: string;
@@ -80,6 +81,7 @@ export interface StudentProfileData {
   department: string | { id?: number; name: string };
   faculty?: string;
   programme: "SWEP" | "SIWES";
+  level?: number | null;
   email_verified: boolean;
 }
 
@@ -88,6 +90,7 @@ export interface CoordinatorProfileData {
   department: string | { id?: number; name: string };
   faculty?: string;
   programme: "SWEP" | "SIWES";
+  level?: number | null;
   phone: string;
   enrolled_students?: number;
   active_cohort?: string | null;
@@ -98,6 +101,7 @@ export interface InvitationItem {
   email: string;
   department: string;
   programme: "SWEP" | "SIWES";
+  level?: number | null;
   status: "PENDING" | "ACCEPTED" | "EXPIRED";
   expires_at: string;
 }
@@ -106,6 +110,7 @@ export interface CreateInvitationPayload {
   email: string;
   department_id: number;
   programme: "SWEP" | "SIWES";
+  level?: number | null;
 }
 
 // ── Paths ────────────────────────────────────────────────

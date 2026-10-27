@@ -203,11 +203,12 @@ export default function StudentAttendancePage() {
           </Link>
 
           <button
+            disabled={loading || attendance.checkedInToday}
             onClick={() => setDialogOpen(true)}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#141414] text-white text-[11px] font-semibold hover:bg-[#282828] transition-colors shadow-xs cursor-pointer"
           >
             <ShieldCheck className="size-3.5" />
-            <span>Enter code</span>
+            <span>{attendance.checkedInToday ? "Attendance verified" : "Enter code"}</span>
           </button>
         </div>
 

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from backend.auth.models import Programme
+from backend.auth.serializers import TrainingLevelMixin
 from .models import (
     AttendanceRecord,
     Cohort,
@@ -13,7 +14,7 @@ from .models import (
 )
 
 
-class CohortSerializer(serializers.ModelSerializer):
+class CohortSerializer(TrainingLevelMixin, serializers.ModelSerializer):
     department = serializers.CharField(source="department.name", read_only=True)
     coordinator = serializers.CharField(source="coordinator.user.email", read_only=True)
     status = serializers.CharField(read_only=True)
@@ -26,7 +27,7 @@ class CohortSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cohort
         fields = [
-            "id", "department", "coordinator", "programme", "session",
+            "id", "department", "coordinator", "programme", "level", "session",
             "start_date", "end_date", "working_days", "deadline_weekday",
             "deadline_time", "max_grace_days", "request_window_days",
             "max_extensions_per_week", "correction_days", "min_filled_chars",
@@ -35,6 +36,7 @@ class CohortSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
+        attrs = super().validate(attrs)
         start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
         end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
         if start_date and end_date and start_date >= end_date:
@@ -229,6 +231,7 @@ class AccountStatusSerializer(serializers.Serializer):
     note = serializers.CharField(max_length=1000)
 
 
-class ProgrammeSerializer(serializers.Serializer):
+class ProgrammeSerializer(TrainingLevelMixin, serializers.Serializer):
     programme = serializers.ChoiceField(choices=Programme.choices)
+    level = serializers.ChoiceField(choices=[200, 300, 400], required=False, allow_null=True)
 

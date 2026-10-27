@@ -12,7 +12,19 @@ def normalize_email(email):
     return email.strip().lower()
 
 
-class SignupSerializer(serializers.Serializer):
+class TrainingLevelMixin:
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        programme = attrs.get("programme", getattr(self.instance, "programme", None))
+        level = attrs.get("level", getattr(self.instance, "level", None))
+        if programme == Programme.SWEP:
+            attrs["level"] = 200
+        elif programme == Programme.SIWES and level not in (300, 400):
+            raise serializers.ValidationError({"level": "Select 300L or 400L for SIWES."})
+        return attrs
+
+
+class SignupSerializer(TrainingLevelMixin, serializers.Serializer):
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
     matric_no = serializers.CharField(max_length=40)
@@ -21,6 +33,7 @@ class SignupSerializer(serializers.Serializer):
         source="department", queryset=Department.objects.all()
     )
     programme = serializers.ChoiceField(choices=Programme.choices)
+    level = serializers.ChoiceField(choices=[200, 300, 400], required=False, allow_null=True)
     password = serializers.CharField(write_only=True, trim_whitespace=False)
 
     def validate_email(self, value):
@@ -79,7 +92,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentProfile
-        fields = ["account", "matric_no", "department", "faculty", "programme", "email_verified"]
+        fields = ["account", "matric_no", "department", "faculty", "programme", "level", "email_verified"]
 
 class CoordinatorProfileSerializer(serializers.ModelSerializer):
     account = LogrAccountSerializer(source="user", read_only=True)
@@ -90,7 +103,7 @@ class CoordinatorProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CoordinatorProfile
-        fields = ["account", "department", "faculty", "programme", "phone", "enrolled_students", "active_cohort"]
+        fields = ["account", "department", "faculty", "programme", "level", "phone", "enrolled_students", "active_cohort"]
 
     def get_enrolled_students(self, obj):
         return StudentProfile.objects.filter(
@@ -137,12 +150,13 @@ class NewPasswordSerializer(serializers.Serializer):
         return value
 
 
-class InvitationSerializer(serializers.Serializer):
+class InvitationSerializer(TrainingLevelMixin, serializers.Serializer):
     email = serializers.EmailField()
     department_id = serializers.PrimaryKeyRelatedField(
         source="department", queryset=Department.objects.all()
     )
     programme = serializers.ChoiceField(choices=Programme.choices)
+    level = serializers.ChoiceField(choices=[200, 300, 400], required=False, allow_null=True)
 
     def validate_email(self, value):
         email = normalize_email(value)

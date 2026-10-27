@@ -301,3 +301,92 @@ class CohortAssignmentTests(TestCase):
             user=student.user,
             trigger=InAppNotification.Trigger.WEEK_LOCKED,
         ).count(), 1)
+
+
+class TrainingLevelAndAttendanceTests(TestCase):
+    def setUp(self):
+        from .models import CohortDepartmentAssignment
+        self.department = Department.objects.create(name="Level Test Department")
+        self.coordinator_user = LogrAccount.objects.create_user("level-coordinator@example.com", "pass")
+        self.coordinator = CoordinatorProfile.objects.create(user=self.coordinator_user,
+            department=self.department, programme="SIWES", level=300, phone="123")
+        self.cohorts = {}
+        for level in (300, 400):
+            cohort = Cohort.objects.create(programme="SIWES", level=level, session="2026/2027",
+                start_date=timezone.localdate(), end_date=timezone.localdate() + timedelta(days=28))
+            CohortDepartmentAssignment.objects.create(cohort=cohort, department=self.department,
+                coordinator=self.coordinator if level == 300 else None)
+            self.cohorts[level] = cohort
+
+    def make_student(self, level):
+        user = LogrAccount.objects.create_user(f"level-{level}@example.com", "pass")
+        return StudentProfile.objects.create(user=user, matric_no=str(level), department=self.department,
+            programme="SIWES", level=level, email_verified=True)
+
+    def test_enrolment_separates_siwes_levels(self):
+        from backend.auth.views import try_auto_assign
+        third = self.make_student(300)
+        fourth = self.make_student(400)
+        assign_students(self.cohorts[300])
+        try_auto_assign(fourth)
+        third.refresh_from_db()
+        fourth.refresh_from_db()
+        self.assertEqual(third.cohort, self.cohorts[300])
+        self.assertEqual(third.coordinator, self.coordinator)
+        self.assertEqual(fourth.cohort, self.cohorts[400])
+        self.assertIsNone(fourth.coordinator)
+
+    def test_accepting_invite_assigns_only_matching_level(self):
+        import secrets
+        from backend.auth.models import CoordinatorInvitation
+        from .models import CohortDepartmentAssignment
+        fourth = self.make_student(400)
+        assign_students(self.cohorts[400])
+        invitation = CoordinatorInvitation.objects.create(email="fourth-coordinator@example.com",
+            department=self.department, programme="SIWES", level=400, token=secrets.token_urlsafe(32))
+        response = APIClient().post("/api/v1/invitations/accept/", {
+            "token": invitation.token, "first_name": "Fourth", "last_name": "Coordinator",
+            "phone": "08012345678", "password": "StrongExample!3427",
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        fourth.refresh_from_db()
+        self.assertEqual(fourth.coordinator.level, 400)
+        self.assertEqual(CohortDepartmentAssignment.objects.get(cohort=self.cohorts[300]).coordinator, self.coordinator)
+
+    def test_wrong_level_coordinator_assignment_is_rejected(self):
+        admin = LogrAccount.objects.create_superuser("levels-admin@example.com", "pass")
+        client = APIClient()
+        client.force_authenticate(admin)
+        response = client.patch(f"/api/v1/admin/cohorts/{self.cohorts[400].pk}/departments/{self.department.pk}/coordinator/",
+            {"coordinator_id": self.coordinator.pk}, format="json")
+        self.assertEqual(response.status_code, 404)
+
+    def test_code_checkin_updates_history_and_coordinator_count(self):
+        from .models import CohortDepartmentAssignment
+        student = self.make_student(200)
+        student.programme = "SWEP"
+        self.coordinator.programme = "SWEP"
+        self.coordinator.level = 200
+        self.coordinator.save()
+        cohort = Cohort.objects.create(programme="SWEP", level=200, session="2026/2027",
+            start_date=timezone.localdate(), end_date=timezone.localdate() + timedelta(days=28),
+            working_days=list(range(7)))
+        CohortDepartmentAssignment.objects.create(cohort=cohort, department=self.department, coordinator=self.coordinator)
+        student.cohort = cohort
+        student.coordinator = self.coordinator
+        student.save()
+        coordinator_client = APIClient()
+        coordinator_client.force_authenticate(self.coordinator_user)
+        created = coordinator_client.post("/api/v1/coordinator/attendance/sessions/", {"minutes": 3}, format="json")
+        self.assertEqual(created.status_code, 201)
+        client = APIClient()
+        client.force_authenticate(student.user)
+        self.assertFalse(client.get("/api/v1/student/attendance/history/").data["checked_in_today"])
+        for expected_status in (201, 200):
+            submitted = client.post("/api/v1/student/attendance/", {"code": created.data["code"]}, format="json")
+            self.assertEqual(submitted.status_code, expected_status)
+        self.assertTrue(client.get("/api/v1/student/attendance/history/").data["checked_in_today"])
+        current = coordinator_client.get("/api/v1/coordinator/attendance/sessions/current/")
+        self.assertEqual(current.data["present_count"], 1)
+        self.assertEqual(current.data["total_students"], 1)
+        self.assertEqual(current.data["records"][0]["status"], "present")

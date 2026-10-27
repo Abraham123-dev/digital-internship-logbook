@@ -36,6 +36,7 @@ class Cohort(models.Model):
     )
 
     programme = models.CharField(max_length=10, choices=Programme.choices)
+    level = models.PositiveSmallIntegerField(choices=[(200, "200L"), (300, "300L"), (400, "400L")], null=True, blank=True)
     session = models.CharField(max_length=20)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -69,7 +70,7 @@ class Cohort(models.Model):
     def generate_default_name(self):
         """Build a name like 'SWEP 2026/2027 - FCSE'. Requires faculty to be set."""
         faculty_code = self.faculty.code if self.faculty else "?"
-        return f"{self.programme} {self.session} - {faculty_code}"
+        return f"{self.programme}{f' {self.level}L' if self.level else ''} {self.session} - {faculty_code}"
 
     def save(self, *args, **kwargs):
         if not self.name and self.faculty:

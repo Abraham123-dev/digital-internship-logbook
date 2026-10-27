@@ -1,4 +1,7 @@
 import base64
+import re
+
+from django.template.loader import render_to_string
 from email.message import EmailMessage
 
 from django.conf import settings
@@ -11,6 +14,29 @@ from googleapiclient.discovery import build
 
 class EmailDeliveryError(Exception):
     """Raised when the configured Gmail sender cannot deliver a message."""
+
+
+def render_email_card(subject, body):
+    """Escape message content and turn action URLs into named buttons."""
+    paragraphs = []
+    buttons = []
+    for line in body.splitlines():
+        for url in re.findall(r"https?://[^\s<>]+", line):
+            if "accept-invite" in url:
+                label = "Accept invitation"
+            elif "reset-password" in url:
+                label = "Reset password"
+            elif "supervisor" in url:
+                label = "Review logbook"
+            else:
+                label = "Open Logr"
+            buttons.append({"url": url, "label": label})
+            line = line.replace(url, "")
+        if line.strip().rstrip(":"):
+            paragraphs.append(line.strip().rstrip(":"))
+    return render_to_string("emails/card.html", {
+        "subject": subject, "paragraphs": paragraphs, "buttons": buttons,
+    })
 
 
 def send_email(*, recipient, subject, body):
@@ -34,6 +60,7 @@ def send_email(*, recipient, subject, body):
         message["From"] = settings.GMAIL_SENDER_EMAIL
         message["Subject"] = subject
         message.set_content(body)
+        message.add_alternative(render_email_card(subject, body), subtype="html")
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
         http = AuthorizedHttp(credentials, http=httplib2.Http(timeout=10))
         service = build("gmail", "v1", http=http, cache_discovery=False)

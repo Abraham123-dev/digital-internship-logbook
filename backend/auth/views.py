@@ -20,6 +20,7 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 
 from .email_service import EmailDeliveryError, send_email
 from .models import (
+    Programme,
     CoordinatorInvitation, CoordinatorProfile, DegreeProgramme, Department,
     Faculty, LogrAccount, StudentProfile,
 )
@@ -113,11 +114,14 @@ def try_auto_assign(student):
     """Hybrid enrolment: auto-assign a verified student to the earliest open cohort if they don't have one."""
     if student.cohort or not student.email_verified:
         return
+    if student.programme == Programme.SIWES and student.level not in (300, 400):
+        return
     from backend.management.models import Cohort, CohortDepartmentAssignment
     # First check multi-dept cohorts where student's department is participating
     assignment = CohortDepartmentAssignment.objects.select_related("cohort", "coordinator").filter(
         department=student.department,
         cohort__programme=student.programme,
+        cohort__level=student.level,
         cohort__end_date__gte=timezone.localdate(),
     ).order_by("cohort__start_date").first()
     if assignment:
@@ -130,6 +134,7 @@ def try_auto_assign(student):
     cohort = Cohort.objects.filter(
         department=student.department,
         programme=student.programme,
+        level=student.level,
         end_date__gte=timezone.localdate(),
     ).order_by("start_date").first()
     if cohort:
@@ -175,6 +180,7 @@ class SignupView(APIView):
             "matric_no": data["matric_no"],
             "department_id": data["department"].id,
             "programme": data["programme"],
+            "level": data["level"],
             "degree_programme_id": data.get("degree_programme_id"),
         }
         cache.set(
@@ -220,6 +226,7 @@ class VerifyOTPView(APIView):
                     matric_no=pending_signup["matric_no"],
                     department=department,
                     programme=pending_signup["programme"],
+                    level=pending_signup.get("level"),
                     degree_programme=degree_programme,
                     email_verified=True,
                 )
@@ -478,7 +485,7 @@ class InvitationListCreateView(APIView):
         invitations = CoordinatorInvitation.objects.select_related("department").order_by("-created_at")[:100]
         return Response({"server_time": current_time(), "results": [
             {"id": item.id, "email": item.email, "department": item.department.name,
-             "programme": item.programme,
+             "programme": item.programme, "level": item.level,
              "status": "EXPIRED" if item.status == "PENDING" and item.is_expired else item.status,
              "expires_at": item.expires_at.isoformat()}
             for item in invitations
@@ -494,6 +501,7 @@ class InvitationListCreateView(APIView):
             email=serializer.validated_data["email"],
             department=serializer.validated_data["department"],
             programme=serializer.validated_data["programme"],
+            level=serializer.validated_data["level"],
             token=token,
             expires_at=timezone.now() + timedelta(hours=72),
         )
@@ -510,7 +518,7 @@ def send_invitation_email(invitation):
     send_email(
         recipient=invitation.email,
         subject="You're invited to Logr",
-        body=f"You are invited to coordinate {invitation.department.name} ({invitation.programme}). Accept within 72 hours: {link}",
+        body=f"You are invited to coordinate {invitation.department.name} ({invitation.programme}{f' {invitation.level}L' if invitation.level else ''}). Accept within 72 hours: {link}",
     )
 
 
@@ -555,7 +563,7 @@ class ValidateInvitationView(APIView):
             return error("invitation_invalid", "Invitation is invalid or expired.")
         return Response({"server_time": current_time(), "email": invitation.email,
                          "department": invitation.department.name,
-                         "programme": invitation.programme,
+                         "programme": invitation.programme, "level": invitation.level,
                          "expires_at": invitation.expires_at.isoformat()})
 
 
@@ -585,6 +593,7 @@ class AcceptInvitationView(APIView):
                     user=user,
                     department=invitation.department,
                     programme=invitation.programme,
+                    level=invitation.level,
                     phone=serializer.validated_data["phone"],
                 )
                 from backend.management.models import CohortDepartmentAssignment
@@ -592,6 +601,7 @@ class AcceptInvitationView(APIView):
                 unassigned_assignments = CohortDepartmentAssignment.objects.filter(
                     department=invitation.department,
                     cohort__programme=invitation.programme,
+                    cohort__level=invitation.level,
                     cohort__end_date__gte=timezone.localdate(),
                     coordinator__isnull=True,
                 )

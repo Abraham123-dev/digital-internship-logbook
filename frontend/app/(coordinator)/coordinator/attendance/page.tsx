@@ -58,6 +58,27 @@ export default function CoordinatorAttendancePage() {
     };
   }, []);
 
+  // Keep the check-in count and roster current while a code is active.
+  useEffect(() => {
+    if (!codeActive) return;
+    let mounted = true;
+    async function refresh() {
+      const res = await coordinatorApi.getAttendanceSession();
+      if (!mounted || !res.ok) return;
+      if (!res.data.active) {
+        setTimeLeft(0);
+        setCodeActive(false);
+        return;
+      }
+      setSession(res.data);
+      setTimeLeft(res.data.secondsLeft ?? 0);
+      setCodeActive(Boolean(res.data.active));
+    }
+    void refresh();
+    const timer = setInterval(refresh, 5000);
+    return () => { mounted = false; clearInterval(timer); };
+  }, [codeActive]);
+
   // Timer countdown simulation
   useEffect(() => {
     if (!codeActive || timeLeft <= 0) return;
@@ -178,7 +199,11 @@ export default function CoordinatorAttendancePage() {
                   </div>
 
                   <button
-                    onClick={() => setCodeActive(false)}
+                    onClick={async () => {
+                      const res = await coordinatorApi.endAttendanceSession(session.id);
+                      if (res.ok) { setCodeActive(false); setTimeLeft(0); }
+                      else setErrorMsg(res.message);
+                    }}
                     className="px-4 py-1.5 rounded-full border border-red-200 text-red-600 hover:bg-red-50 text-[11px] font-semibold transition-colors cursor-pointer"
                   >
                     End session

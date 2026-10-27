@@ -77,6 +77,7 @@ export default function AdminCohortsPage() {
     department_ids: number[];
     session: string;
     programme: "SWEP" | "SIWES";
+    level: number;
     start_date: string;
     end_date: string;
     total_weeks: number;
@@ -86,6 +87,7 @@ export default function AdminCohortsPage() {
     department_ids: [],
     session: "2026/2027",
     programme: "SWEP",
+    level: 300,
     start_date: "",
     end_date: "",
     total_weeks: 12,
@@ -197,6 +199,7 @@ export default function AdminCohortsPage() {
       department_ids: initialFac ? initialFac.departments.map((d) => d.id) : [],
       session: "2026/2027",
       programme: "SWEP",
+      level: 300,
       start_date: "",
       end_date: "",
       total_weeks: 12,
@@ -236,6 +239,7 @@ export default function AdminCohortsPage() {
         department_ids: formData.department_ids,
         session: formData.session.trim(),
         programme: formData.programme,
+        level: formData.programme === "SWEP" ? 200 : formData.level,
         start_date: formData.start_date,
         end_date: formData.end_date,
         total_weeks: formData.total_weeks || 12,
@@ -263,7 +267,7 @@ export default function AdminCohortsPage() {
     preferInvite = false
   ) {
     setAssignError(null);
-    const eligible = coordinators.filter((c) => c.programme === cohort.programme);
+    const eligible = coordinators.filter((c) => c.programme === cohort.programme && c.level === cohort.level);
     // If no eligible coordinators exist, or if explicitly requested, default to the invite tab
     const defaultTab = preferInvite || eligible.length === 0 ? "invite" : "assign";
 
@@ -335,6 +339,7 @@ export default function AdminCohortsPage() {
         email,
         department_id: assignModal.department!.id,
         programme: assignModal.cohort!.programme as "SWEP" | "SIWES",
+        level: assignModal.cohort!.level,
       });
 
       if (!res.ok) {
@@ -380,11 +385,11 @@ export default function AdminCohortsPage() {
   }
 
   // Find pending invitation for a department & programme
-  function getPendingInvite(deptName: string, programme: string) {
+  function getPendingInvite(deptName: string, programme: string, level?: number | null) {
     return invitations.find(
       (inv) =>
         inv.status === "PENDING" &&
-        inv.programme === programme &&
+        inv.programme === programme && inv.level === level &&
         (inv.department.toLowerCase().includes(deptName.toLowerCase()) ||
           deptName.toLowerCase().includes(inv.department.toLowerCase()))
     );
@@ -392,7 +397,7 @@ export default function AdminCohortsPage() {
 
   // Coordinators eligible for the modal's cohort programme
   const eligibleCoordinators = coordinators.filter(
-    (c) => !assignModal.cohort || c.programme === assignModal.cohort.programme
+    (c) => !assignModal.cohort || c.programme === assignModal.cohort.programme && c.level === assignModal.cohort.level
   );
 
   return (
@@ -505,10 +510,10 @@ export default function AdminCohortsPage() {
             {cohorts.map((cohort) => {
               const isExpanded = expandedCohortIds[cohort.id] ?? true;
               const unassignedCount = cohort.departments.filter(
-                (d) => !d.coordinator && !getPendingInvite(d.name, cohort.programme)
+                (d) => !d.coordinator && !getPendingInvite(d.name, cohort.programme, cohort.level)
               ).length;
               const pendingInviteCount = cohort.departments.filter(
-                (d) => !d.coordinator && getPendingInvite(d.name, cohort.programme)
+                (d) => !d.coordinator && getPendingInvite(d.name, cohort.programme, cohort.level)
               ).length;
 
               return (
@@ -522,7 +527,7 @@ export default function AdminCohortsPage() {
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="px-2 py-0.5 rounded bg-[#141414] text-white text-[10px] font-semibold tracking-wider uppercase font-mono">
-                            {cohort.programme}
+                            {cohort.programme}{cohort.level ? ` - ${cohort.level}L` : ""}
                           </span>
                           {cohort.faculty && (
                             <span className="px-2 py-0.5 rounded bg-[#F0EFEA] text-[#4A4944] text-[10.5px] font-medium border border-[#E2E1DA]">
@@ -627,7 +632,7 @@ export default function AdminCohortsPage() {
                           {cohort.departments.map((dept) => {
                             const hasCoordinator = Boolean(dept.coordinator);
                             const pendingInvite = !hasCoordinator
-                              ? getPendingInvite(dept.name, cohort.programme)
+                              ? getPendingInvite(dept.name, cohort.programme, cohort.level)
                               : null;
 
                             return (
@@ -886,6 +891,17 @@ export default function AdminCohortsPage() {
                   </p>
                 </div>
 
+                {formData.programme === "SIWES" && (
+                  <div className="space-y-1.5">
+                    <label htmlFor="cohort-level" className="text-[12px] font-medium text-[#2E2D29]">SIWES Level *</label>
+                    <select id="cohort-level" value={formData.level} onChange={(e) => setFormData({ ...formData, level: Number(e.target.value) })}
+                      className="w-full h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[13px]">
+                      <option value={300}>300L (Part 3)</option>
+                      <option value={400}>400L (Part 4)</option>
+                    </select>
+                  </div>
+                )}
+
                 {/* Duration & Weeks */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1.5">
@@ -1112,7 +1128,7 @@ export default function AdminCohortsPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-[#7A7973]">Programme:</span>
-                        <span className="font-semibold text-[#141414]">{assignModal.cohort.programme}</span>
+                        <span className="font-semibold text-[#141414]">{assignModal.cohort.programme}{assignModal.cohort.level ? ` - ${assignModal.cohort.level}L` : " (level not set)"}</span>
                       </div>
                     </div>
 

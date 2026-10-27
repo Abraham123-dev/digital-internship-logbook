@@ -203,6 +203,18 @@ function VerifiedStep() {
 }
 
 /* ── Signup form ─────────────────────────────────────────── */
+const RightPanel = ({ children }: { children: React.ReactNode }) => (
+  <div className="min-h-screen lg:grid lg:grid-cols-[340px_1fr] xl:grid-cols-[380px_1fr] font-sans selection:bg-[#F04D23] selection:text-white">
+    <AuthBrandPanel variant="signup" />
+    <div className="min-h-screen bg-[#EDECE6] flex flex-col">
+      <MobileAuthBar />
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-8 py-8 sm:py-12 overflow-y-auto">
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
 type FormState = Omit<StudentSignupPayload, "department_id"> & {
   department_id: number | "";
   degree_programme_id: number | null;
@@ -211,7 +223,7 @@ type FormState = Omit<StudentSignupPayload, "department_id"> & {
 
 const INITIAL: FormState = {
   first_name: "", last_name: "", matric_no: "", email: "",
-  department_id: "", degree_programme_id: null, programme: "SWEP", password: "", confirmPassword: "",
+  department_id: "", degree_programme_id: null, programme: "SWEP", level: 300, password: "", confirmPassword: "",
 };
 
 type Step = "form" | "otp" | "done";
@@ -307,17 +319,7 @@ export default function SignupPage() {
   }
 
   /* Shared right-panel wrapper */
-  const RightPanel = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen lg:grid lg:grid-cols-[340px_1fr] xl:grid-cols-[380px_1fr] font-sans selection:bg-[#F04D23] selection:text-white">
-      <AuthBrandPanel variant="signup" />
-      <div className="min-h-screen bg-[#EDECE6] flex flex-col">
-        <MobileAuthBar />
-        <div className="flex-1 flex items-center justify-center px-4 sm:px-8 py-8 sm:py-12 overflow-y-auto">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
+
 
   if (step === "otp") return <RightPanel><OtpStep email={form.email} onVerified={() => setStep("done")} /></RightPanel>;
   if (step === "done") return <RightPanel><VerifiedStep /></RightPanel>;
@@ -370,13 +372,22 @@ export default function SignupPage() {
                     autoComplete="off" placeholder="ENG/2021/001" className={inputCls(!!fieldErrors.matric_no)} />
                 </Field>
                 <Field label="Programme" id="programme">
-                  <select id="programme" value={form.programme} onChange={(e) => set("programme")(e.target.value)}
+                  <select id="programme" value={form.programme} onChange={(e) => setForm((f) => ({ ...f, programme: e.target.value as "SWEP" | "SIWES" }))}
                     className={inputCls()}>
                     <option value="SWEP">SWEP</option>
                     <option value="SIWES">SIWES</option>
                   </select>
                 </Field>
               </div>
+
+              {form.programme === "SIWES" && (
+                <Field label="SIWES Level" id="level" error={fieldErrors.level}>
+                  <select id="level" value={form.level ?? 300} onChange={(e) => setForm((f) => ({ ...f, level: Number(e.target.value) }))} className={inputCls(!!fieldErrors.level)}>
+                    <option value={300}>300L (Part 3)</option>
+                    <option value={400}>400L (Part 4)</option>
+                  </select>
+                </Field>
+              )}
 
               {/* Email */}
               <Field label="Student email" id="email" error={fieldErrors.email}>

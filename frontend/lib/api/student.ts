@@ -163,6 +163,7 @@ export interface StudentDashboardData {
   currentWeek: StudentWeekSummary | null;
   weeks: StudentWeekSummary[];
   attendanceSessionActive?: boolean;
+  checkedInToday?: boolean;
   recentFeedback?: Array<{
     week: string;
     date: string;
@@ -177,6 +178,7 @@ export interface StudentAttendanceData {
   attended: number;
   total: number;
   activeSession: boolean;
+  checkedInToday?: boolean;
   activeSessionExpiresAt?: string;
   history: Array<{
     date: string;
@@ -366,13 +368,16 @@ export const studentApi = {
 
       // 4. If SWEP, check attendance history
       let attendanceRate = 100;
+      let checkedInToday = false;
       if (isMatched && programme === "SWEP") {
         try {
           const attRes = await api.get<{
             presentCount: number;
             totalCodedDays: number;
             records: any[];
+            checked_in_today: boolean;
           }>("/student/attendance/history/");
+          if (attRes.ok) checkedInToday = attRes.data.checked_in_today;
           if (attRes.ok && attRes.data.totalCodedDays > 0) {
             attendanceRate = Math.round((attRes.data.presentCount / attRes.data.totalCodedDays) * 100);
           }
@@ -461,6 +466,7 @@ export const studentApi = {
           currentWeek,
           weeks,
           attendanceSessionActive: false,
+          checkedInToday,
           recentFeedback: feedbackItems,
         },
       };
@@ -571,6 +577,7 @@ export const studentApi = {
     const res = await api.get<{
       presentCount: number;
       totalCodedDays: number;
+      checked_in_today: boolean;
       records: Array<{
         date: string;
         status: "PRESENT" | "ABSENT" | "EXCUSED";
@@ -601,6 +608,7 @@ export const studentApi = {
           attended: res.data.presentCount,
           total: res.data.totalCodedDays,
           activeSession: false,
+          checkedInToday: res.data.checked_in_today,
           history,
         },
       };

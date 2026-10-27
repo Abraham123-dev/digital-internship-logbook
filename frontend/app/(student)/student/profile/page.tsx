@@ -100,8 +100,8 @@ export default function StudentProfilePage() {
           const cohort = cohortRes.ok ? cohortRes.data?.cohort : null;
           const coordinator = cohortRes.ok
             ? cohort?.coordinator_name
-              ? `${cohort.coordinator_name}${cohort.coordinator_email ? ` (${cohort.coordinator_email})` : ""}`
-              : cohort?.coordinator || cohort?.coordinator_email || "Not yet assigned"
+              ? cohort.coordinator_name
+              : "Not yet assigned"
             : "Unable to load coordinator";
           const session = cohortRes.ok && cohortRes.data?.cohort?.session
             ? cohortRes.data.cohort.session

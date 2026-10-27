@@ -22,6 +22,7 @@ export default function AdminInvitationsPage() {
   const [email, setEmail] = useState("");
   const [deptId, setDeptId] = useState<number>(1);
   const [programme, setProgramme] = useState<"SWEP" | "SIWES">("SWEP");
+  const [level, setLevel] = useState(300);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export default function AdminInvitationsPage() {
       email,
       department_id: deptId,
       programme,
+      level: programme === "SWEP" ? 200 : level,
     });
     setSubmitting(false);
 
@@ -197,6 +199,13 @@ export default function AdminInvitationsPage() {
                   <option value="SWEP">SWEP</option>
                   <option value="SIWES">SIWES</option>
                 </select>
+                {programme === "SIWES" && (
+                  <select aria-label="SIWES level" value={level} onChange={(e) => setLevel(Number(e.target.value))}
+                    className="h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[12.5px]">
+                    <option value={300}>300L</option>
+                    <option value={400}>400L</option>
+                  </select>
+                )}
                 <button
                   type="submit"
                   disabled={submitting}
@@ -250,7 +259,7 @@ export default function AdminInvitationsPage() {
 
                       <td className="px-4 py-3.5">
                         <span className="inline-block text-[9.5px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                          {inv.programme}
+                          {inv.programme}{inv.level ? ` - ${inv.level}L` : ""}
                         </span>
                       </td>
 
