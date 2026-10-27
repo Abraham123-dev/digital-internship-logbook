@@ -256,12 +256,21 @@ export default function AdminCohortsPage() {
       }
 
       setSuccessMsg(
-        `Cohort "${res.data?.name || "Faculty Cohort"}" created successfully. Verified students in participating departments have been enrolled!`
+        `Cohort "${res.data?.name || "Faculty Cohort"}" created successfully. Matching students have been enrolled and departments with one matching active coordinator have been assigned.`
       );
       setIsCreateModalOpen(false);
       loadData();
       setTimeout(() => setSuccessMsg(null), 6000);
     });
+  }
+
+  function matchingCoordinators(cohort: AdminCohortItem, department: AdminCohortDepartment) {
+    return coordinators.filter((coordinator) =>
+      coordinator.status === "ACTIVE" &&
+      coordinator.department === department.name &&
+      coordinator.programme === cohort.programme &&
+      (cohort.programme !== "SIWES" || coordinator.level === cohort.level)
+    );
   }
 
   // Open assign / invite coordinator modal
@@ -271,7 +280,7 @@ export default function AdminCohortsPage() {
     preferInvite = false
   ) {
     setAssignError(null);
-    const eligible = coordinators.filter((c) => c.programme === cohort.programme && c.level === cohort.level);
+    const eligible = matchingCoordinators(cohort, dept);
     // If no eligible coordinators exist, or if explicitly requested, default to the invite tab
     const defaultTab = preferInvite || eligible.length === 0 ? "invite" : "assign";
 
@@ -400,9 +409,9 @@ export default function AdminCohortsPage() {
   }
 
   // Coordinators eligible for the modal's cohort programme
-  const eligibleCoordinators = coordinators.filter(
-    (c) => !assignModal.cohort || c.programme === assignModal.cohort.programme && c.level === assignModal.cohort.level
-  );
+  const eligibleCoordinators = assignModal.cohort && assignModal.department
+    ? matchingCoordinators(assignModal.cohort, assignModal.department)
+    : [];
 
   return (
     <AdminShell
@@ -499,7 +508,7 @@ export default function AdminCohortsPage() {
             <Calendar className="size-8 text-[#B0AFA9] mx-auto" />
             <h3 className="text-[14px] font-bold text-[#141414]">No Cohorts Created Yet</h3>
             <p className="text-[12px] text-[#7A7973] max-w-sm mx-auto">
-              Create a faculty-wide cohort for SWEP or SIWES, select participating departments, and assign or invite coordinators.
+              Create a faculty-wide cohort. Matching students and coordinators are assigned automatically.
             </p>
             <button
               onClick={handleOpenCreateModal}
@@ -639,6 +648,7 @@ export default function AdminCohortsPage() {
                               ? getPendingInvite(dept.name, cohort.programme, cohort.level)
                               : null;
 
+                            const matching = matchingCoordinators(cohort, dept);
                             return (
                               <div
                                 key={dept.id}
@@ -692,7 +702,9 @@ export default function AdminCohortsPage() {
                                     </div>
                                   ) : (
                                     <p className="text-[11px] text-[#9A9990]">
-                                      No coordinator assigned yet. Student logbook sign-offs and assessments will remain pending.
+                                      {matching.length > 1
+                                        ? "Several coordinators match this department. Choose who will manage this cohort."
+                                        : "No coordinator assigned yet. Invite a coordinator or select an existing match."}
                                     </p>
                                   )}
                                 </div>
@@ -706,7 +718,7 @@ export default function AdminCohortsPage() {
                                       <span>Change Coordinator</span>
                                     </button>
                                   ) : pendingInvite ? (
-                                    <button
+                                    matching.length > 0 && <button
                                       onClick={() => handleOpenAssignModal(cohort, dept)}
                                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11.5px] font-medium border border-[#D5D4CD] bg-white text-[#4A4944] hover:bg-[#F2F1EC] hover:text-[#141414] transition-all cursor-pointer"
                                     >
@@ -714,13 +726,13 @@ export default function AdminCohortsPage() {
                                     </button>
                                   ) : (
                                     <div className="flex items-center gap-1.5">
-                                      <button
+                                      {matching.length > 0 && <button
                                         onClick={() => handleOpenAssignModal(cohort, dept, false)}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11.5px] font-medium bg-[#141414] text-white hover:bg-[#282828] transition-all shadow-xs cursor-pointer"
                                       >
                                         <Plus className="size-3" />
-                                        <span>Assign Coordinator</span>
-                                      </button>
+                                        <span>{matching.length > 1 ? "Choose Coordinator" : "Assign Coordinator"}</span>
+                                      </button>}
                                       <button
                                         onClick={() => handleOpenAssignModal(cohort, dept, true)}
                                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11.5px] font-medium border border-[#D5D4CD] bg-white text-[#4A4944] hover:bg-[#F2F1EC] hover:text-[#141414] transition-all cursor-pointer"
@@ -904,7 +916,7 @@ export default function AdminCohortsPage() {
                     })}
                   </div>
                   <p className="text-[11px] text-[#7A7973]">
-                    Only departments selected here will be included in the cohort. You can assign or invite coordinators to each department after creation.
+                    Only selected departments are included. A single matching active coordinator is assigned automatically; if several match, choose one after creation. Invite a coordinator where none exists.
                   </p>
                 </div>
 
@@ -1063,7 +1075,7 @@ export default function AdminCohortsPage() {
                       >
                         <option value="">&mdash; Leave Unassigned &mdash;</option>
                         {eligibleCoordinators.map((c) => (
-                          <option key={c.id} value={c.id}>
+                          <option key={c.id} value={c.profileId ?? c.id}>
                             {c.name} ({c.email}) &bull; {c.department}
                           </option>
                         ))}

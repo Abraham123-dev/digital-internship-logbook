@@ -364,3 +364,10 @@ Apply the new schema migrations before running this version:
 ```powershell
 python manage.py migrate
 ```
+
+
+### Automatic coordinator assignment at cohort creation
+
+`POST /admin/cohorts/` now assigns an existing active coordinator in each selected department before enrolling students. SWEP matches department and programme; SIWES additionally matches 300L or 400L. Inactive coordinators are excluded. Exactly one matching active coordinator is assigned automatically. If none match, the department remains unassigned and the admin can invite one. If several match, it remains unassigned until an admin selects a coordinator; students still enrol and are linked to that coordinator when the selection is saved. Existing assignments are preserved. Creating a new cohort does not move students already enrolled in another cohort.
+
+The cohorts page shows Invite when no matching coordinator exists, Choose Coordinator for multiple matches, and Change Coordinator for an assigned department. Manual assignment remains available for older unassigned cohorts that already have a matching coordinator. No database migration is required for this change.

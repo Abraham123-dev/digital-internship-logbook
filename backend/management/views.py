@@ -171,6 +171,26 @@ class NotificationReadAllView(APIView):
         return Response({"updated": updated})
 
 
+def auto_assign_coordinators(cohort):
+    """Assign an unambiguous active coordinator to each participating department."""
+    if cohort.programme == Programme.SIWES and cohort.level not in (300, 400):
+        return
+    for assignment in cohort.department_assignments.filter(coordinator__isnull=True):
+        candidates = CoordinatorProfile.objects.filter(
+            department_id=assignment.department_id,
+            programme=cohort.programme,
+            user__is_active=True,
+            user__status=LogrAccount.Status.ACTIVE,
+        )
+        if cohort.programme == Programme.SIWES:
+            candidates = candidates.filter(level=cohort.level)
+        matches = list(candidates.order_by("pk")[:2])
+        if len(matches) == 1:
+            assignment.coordinator = matches[0]
+            assignment.save(update_fields=["coordinator"])
+            sync_coordinator_to_students(assignment)
+
+
 def assign_students(cohort):
     """Assign eligible students from all participating departments to this cohort.
 
@@ -188,22 +208,25 @@ def assign_students(cohort):
             students = StudentProfile.objects.filter(
                 department=assignment.department,
                 programme=cohort.programme,
-                level=cohort.level,
                 email_verified=True,
                 cohort__isnull=True,
             )
+            if cohort.programme == Programme.SIWES:
+                students = students.filter(level=cohort.level)
             students.update(
                 cohort=cohort,
                 coordinator=assignment.coordinator,  # may be None – that is fine
             )
     elif cohort.department:
         # Legacy single-department cohort path (backward compat)
-        StudentProfile.objects.filter(
+        students = StudentProfile.objects.filter(
             department=cohort.department,
             programme=cohort.programme,
-            level=cohort.level,
             cohort__isnull=True,
-        ).update(cohort=cohort, coordinator=cohort.coordinator)
+        )
+        if cohort.programme == Programme.SIWES:
+            students = students.filter(level=cohort.level)
+        students.update(cohort=cohort, coordinator=cohort.coordinator)
 
 
 def sync_coordinator_to_students(assignment):
@@ -487,6 +510,7 @@ class AdminCohortListView(APIView):
                 CohortDepartmentAssignment(cohort=cohort, department=dept)
                 for dept in departments
             ])
+            auto_assign_coordinators(cohort)
             assign_students(cohort)
             record_audit(request, "COHORT_CREATED", cohort, {
                 "faculty_id": faculty.id,
@@ -605,11 +629,16 @@ class AdminCohortDepartmentAssignView(APIView):
             })
             return Response({"cohort_id": cohort_id, "department_id": department_id, "coordinator": None})
 
-        coordinator = CoordinatorProfile.objects.select_related("user").filter(
+        candidates = CoordinatorProfile.objects.select_related("user").filter(
             pk=coordinator_id,
+            department_id=department_id,
             programme=cohort.programme,
-            level=cohort.level,
-        ).first()
+            user__is_active=True,
+            user__status=LogrAccount.Status.ACTIVE,
+        )
+        if cohort.programme == Programme.SIWES:
+            candidates = candidates.filter(level=cohort.level)
+        coordinator = candidates.first()
         if not coordinator:
             return api_error(
                 "coordinator_not_found",
@@ -2105,6 +2134,7 @@ class AdminUserListView(APIView):
                     "running_score_avg": running_score_avg,
                 } if student else None,
                 "coordinator_profile": {
+                    "id": coordinator.pk,
                     "department_id": dept.id if dept else None,
                     "department_name": dept.name if dept else None,
                     "faculty_id": fac.id if fac else None,

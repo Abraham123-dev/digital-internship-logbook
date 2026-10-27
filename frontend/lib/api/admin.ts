@@ -145,6 +145,7 @@ export interface PendingStudentItem {
 
 export interface AdminCoordinatorItem {
   id: number;
+  profileId?: number;
   name: string;
   email: string;
   department: string;
@@ -355,6 +356,7 @@ export const adminApi = {
       const profile = u.coordinator_profile || {};
       return {
         id: u.id,
+        profileId: profile.id,
         name: fullName || u.name || (u.email ? u.email.split("@")[0] : "Coordinator"),
         email: u.email || "",
         department: profile.department_name || u.department || "—",

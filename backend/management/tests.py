@@ -390,3 +390,101 @@ class TrainingLevelAndAttendanceTests(TestCase):
         self.assertEqual(current.data["present_count"], 1)
         self.assertEqual(current.data["total_students"], 1)
         self.assertEqual(current.data["records"][0]["status"], "present")
+
+
+class AutomaticCoordinatorEnrollmentTests(TestCase):
+    def setUp(self):
+        from backend.auth.models import Faculty
+        self.faculty = Faculty.objects.create(name="Enrollment Faculty", code="ENROL")
+        self.department = Department.objects.create(name="Enrollment Department", faculty=self.faculty)
+        self.other_department = Department.objects.create(name="Other Enrollment Department", faculty=self.faculty)
+        self.client = APIClient()
+        self.client.force_authenticate(LogrAccount.objects.create_superuser("enrollment-admin@example.com", "pass"))
+        self.serial = 0
+
+    def coordinator(self, programme="SWEP", level=None, department=None, active=True):
+        self.serial += 1
+        user = LogrAccount.objects.create_user(f"enrollment-coordinator-{self.serial}@example.com", "pass", is_active=active, role=LogrAccount.Role.COORDINATOR)
+        return CoordinatorProfile.objects.create(user=user, department=department or self.department,
+            programme=programme, level=level, phone="123")
+
+    def student(self, programme="SWEP", level=None, department=None):
+        self.serial += 1
+        user = LogrAccount.objects.create_user(f"enrollment-student-{self.serial}@example.com", "pass")
+        return StudentProfile.objects.create(user=user, matric_no=f"ENROL-{self.serial}",
+            programme=programme, level=level, department=department or self.department, email_verified=True)
+
+    def create_cohort(self, programme="SWEP", level=200):
+        response = self.client.post("/api/v1/admin/cohorts/", {
+            "faculty_id": self.faculty.pk, "department_ids": [self.department.pk, self.other_department.pk],
+            "programme": programme, "level": level, "session": "2026/2027",
+            "start_date": str(timezone.localdate()), "end_date": str(timezone.localdate() + timedelta(days=30)),
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        return Cohort.objects.get(pk=response.data["id"])
+
+    def test_swep_assigns_existing_coordinators_and_students_by_department_and_programme(self):
+        coordinator = self.coordinator()
+        other_coordinator = self.coordinator(department=self.other_department)
+        self.coordinator(programme="SIWES", level=300)
+        student = self.student()
+        other_student = self.student(department=self.other_department)
+        siwes_student = self.student(programme="SIWES", level=300)
+        cohort = self.create_cohort()
+        for student, expected in [(student, coordinator), (other_student, other_coordinator)]:
+            student.refresh_from_db()
+            self.assertEqual(student.cohort, cohort)
+            self.assertEqual(student.coordinator, expected)
+        siwes_student.refresh_from_db()
+        self.assertIsNone(siwes_student.cohort)
+        self.assertEqual(cohort.department_assignments.get(department=self.department).coordinator, coordinator)
+
+    def test_siwes_separates_coordinators_and_students_by_level(self):
+        coordinators = {level: self.coordinator("SIWES", level) for level in (300, 400)}
+        students = {level: self.student("SIWES", level) for level in (300, 400)}
+        for level in (300, 400):
+            cohort = self.create_cohort("SIWES", level)
+            students[level].refresh_from_db()
+            self.assertEqual(students[level].cohort, cohort)
+            self.assertEqual(students[level].coordinator, coordinators[level])
+        self.assertNotEqual(students[300].cohort, students[400].cohort)
+
+    def test_inactive_coordinators_are_not_assigned(self):
+        self.coordinator(active=False)
+        cohort = self.create_cohort()
+        self.assertIsNone(cohort.department_assignments.get(department=self.department).coordinator)
+
+    def test_multiple_matches_require_manual_choice_without_replacing_other_assignments(self):
+        from .views import auto_assign_coordinators
+        first = self.coordinator()
+        self.coordinator()
+        student = self.student()
+        cohort = self.create_cohort()
+        assignment = cohort.department_assignments.get(department=self.department)
+        self.assertIsNone(assignment.coordinator)
+        student.refresh_from_db()
+        self.assertEqual(student.cohort, cohort)
+        self.assertIsNone(student.coordinator)
+        users = self.client.get("/api/v1/admin/users/?role=coordinator")
+        self.assertEqual(users.status_code, 200)
+        selected = next(item for item in users.data["results"] if item["email"] == first.user.email)
+        self.assertEqual(selected["coordinator_profile"]["id"], first.pk)
+        response = self.client.patch(
+            f"/api/v1/admin/cohorts/{cohort.pk}/departments/{self.department.pk}/coordinator/",
+            {"coordinator_id": first.pk}, format="json")
+        self.assertEqual(response.status_code, 200)
+        auto_assign_coordinators(cohort)
+        assignment.refresh_from_db()
+        student.refresh_from_db()
+        self.assertEqual(assignment.coordinator, first)
+        self.assertEqual(student.coordinator, first)
+
+    def test_student_joining_after_swep_creation_uses_department_and_programme(self):
+        from backend.auth.views import try_auto_assign
+        coordinator = self.coordinator()
+        cohort = self.create_cohort()
+        student = self.student()
+        try_auto_assign(student)
+        student.refresh_from_db()
+        self.assertEqual(student.cohort, cohort)
+        self.assertEqual(student.coordinator, coordinator)

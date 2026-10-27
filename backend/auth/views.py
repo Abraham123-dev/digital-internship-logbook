@@ -118,12 +118,14 @@ def try_auto_assign(student):
         return
     from backend.management.models import Cohort, CohortDepartmentAssignment
     # First check multi-dept cohorts where student's department is participating
-    assignment = CohortDepartmentAssignment.objects.select_related("cohort", "coordinator").filter(
+    assignments = CohortDepartmentAssignment.objects.select_related("cohort", "coordinator").filter(
         department=student.department,
         cohort__programme=student.programme,
-        cohort__level=student.level,
         cohort__end_date__gte=timezone.localdate(),
-    ).order_by("cohort__start_date").first()
+    )
+    if student.programme == Programme.SIWES:
+        assignments = assignments.filter(cohort__level=student.level)
+    assignment = assignments.order_by("cohort__start_date").first()
     if assignment:
         student.cohort = assignment.cohort
         student.coordinator = assignment.coordinator
@@ -131,12 +133,14 @@ def try_auto_assign(student):
         return
 
     # Fallback to legacy single-dept cohort
-    cohort = Cohort.objects.filter(
+    cohorts = Cohort.objects.filter(
         department=student.department,
         programme=student.programme,
-        level=student.level,
         end_date__gte=timezone.localdate(),
-    ).order_by("start_date").first()
+    )
+    if student.programme == Programme.SIWES:
+        cohorts = cohorts.filter(level=student.level)
+    cohort = cohorts.order_by("start_date").first()
     if cohort:
         student.cohort = cohort
         student.coordinator = cohort.coordinator
