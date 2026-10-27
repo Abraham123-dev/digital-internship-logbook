@@ -30,6 +30,7 @@ export function CoordinatorShell({
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [attendanceEnabled, setAttendanceEnabled] = useState(false);
   const [profile, setProfile] = useState<{ name: string; dept: string; prog: string } | null>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("logr_user_profile");
@@ -45,6 +46,7 @@ export function CoordinatorShell({
     authApi.coordinatorProfile().then((res) => {
       if (mounted && res.ok && res.data?.profile) {
         const p = res.data.profile;
+        setAttendanceEnabled(p.programme === "SWEP");
         const name = `${p.account.first_name || ""} ${p.account.last_name || ""}`.trim();
         const dept = (typeof p.department === "string" ? p.department : p.department?.name) || "—";
         const prog = p.programme || "SWEP";
@@ -61,7 +63,7 @@ export function CoordinatorShell({
     { label: "Weekly Reviews",      href: "/coordinator/students?filter=needs_review", icon: <CheckSquare className="size-4" /> },
     { label: "Students & Cohort",   href: "/coordinator/students",    icon: <Users className="size-4" /> },
     { label: "Extension Requests",  href: "/coordinator/extensions",  icon: <Clock className="size-4" /> },
-    { label: "SWEP Attendance",     href: "/coordinator/attendance",  icon: <Calendar className="size-4" /> },
+    ...(attendanceEnabled ? [{ label: "SWEP Attendance", href: "/coordinator/attendance", icon: <Calendar className="size-4" /> }] : []),
     { label: "Cohort Settings",     href: "/coordinator/cohort",      icon: <Settings className="size-4" /> },
     { label: "Profile",             href: "/coordinator/profile",     icon: <User className="size-4" /> },
   ];

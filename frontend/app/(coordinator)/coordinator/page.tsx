@@ -13,6 +13,7 @@ import { coordinatorApi } from "@/lib/api/coordinator";
 
 export default function CoordinatorDashboardPage() {
   const [loading, setLoading] = useState(true);
+  const [isSwep, setIsSwep] = useState(false);
   const [data, setData] = useState<{
     stats: {
       enrolledStudents: number;
@@ -50,11 +51,11 @@ export default function CoordinatorDashboardPage() {
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const [dashRes, sessionRes] = await Promise.all([
-        coordinatorApi.getDashboardData(),
-        coordinatorApi.getAttendanceSession(),
-      ]);
+      const dashRes = await coordinatorApi.getDashboardData();
+      const supportsAttendance = dashRes.ok && dashRes.data.cohortInfo.programme === "SWEP";
+      const sessionRes = supportsAttendance ? await coordinatorApi.getAttendanceSession() : null;
       if (!mounted) return;
+      setIsSwep(supportsAttendance);
       if (dashRes.ok) {
         setData(dashRes.data);
       } else {
@@ -77,7 +78,7 @@ export default function CoordinatorDashboardPage() {
         });
       }
       setLoading(false);
-      if (sessionRes.ok && sessionRes.data && sessionRes.data.code && sessionRes.data.id > 0) {
+      if (sessionRes?.ok && sessionRes.data && sessionRes.data.code && sessionRes.data.id > 0) {
         setAttendanceSession({
           id: sessionRes.data.id,
           code: sessionRes.data.code,
@@ -107,7 +108,7 @@ export default function CoordinatorDashboardPage() {
         <div className="space-y-6">
 
           {/* Active Attendance Session Banner — only shown when a real session exists */}
-          {attendanceSession && (
+          {isSwep && attendanceSession && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 p-4 rounded-lg bg-white border border-[#E2E1DA] shadow-2xs">
               <div className="flex items-center gap-3">
                 <span className="size-2 rounded-full bg-[#F04D23] animate-pulse shrink-0" />
@@ -130,7 +131,7 @@ export default function CoordinatorDashboardPage() {
           )}
 
           {/* 4 Balanced Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={`grid grid-cols-2 ${isSwep ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
             <div className="bg-white rounded-lg border border-[#E2E1DA] p-4 shadow-2xs">
               <p className="text-[10px] font-mono font-medium text-[#7A7973] uppercase tracking-wider">Enrolled Students</p>
               <div className="flex items-baseline gap-1 mt-1">
@@ -164,6 +165,7 @@ export default function CoordinatorDashboardPage() {
               </p>
             </div>
 
+            {isSwep && (
             <div className="bg-white rounded-lg border border-[#E2E1DA] p-4 shadow-2xs">
               <p className="text-[10px] font-mono font-medium text-[#7A7973] uppercase tracking-wider">Average Attendance</p>
               <div className="flex items-baseline gap-1 mt-1">
@@ -178,6 +180,7 @@ export default function CoordinatorDashboardPage() {
                 <p className="text-[10.5px] text-[#7A7973] mt-0.5">No attendance logged</p>
               )}
             </div>
+            )}
           </div>
 
           {/* Lower 12-Column Split: Submissions Queue & Current Cohort Details */}
@@ -294,7 +297,7 @@ export default function CoordinatorDashboardPage() {
                   {[
                     { label: "Enrolled students", href: "/coordinator/students", icon: <Users className="size-3.5" /> },
                     { label: "Extension requests", href: "/coordinator/extensions", icon: <Clock className="size-3.5" /> },
-                    { label: "Daily attendance codes", href: "/coordinator/attendance", icon: <Calendar className="size-3.5" /> },
+                    ...(isSwep ? [{ label: "Daily attendance codes", href: "/coordinator/attendance", icon: <Calendar className="size-3.5" /> }] : []),
                     { label: "Cohort schedule & deadlines", href: "/coordinator/cohort", icon: <CheckSquare className="size-3.5" /> },
                   ].map((link) => (
                     <Link
