@@ -292,8 +292,17 @@ export const authApi = {
     api.get(P.adminInvitations),
 
   /** Admin: Create and send a new coordinator invitation. */
-  createInvitation: (data: CreateInvitationPayload): Promise<ApiResult<{ server_time: string; id: number; status: string }>> =>
-    api.post(P.adminInvitations, data),
+  createInvitation: async (data: CreateInvitationPayload): Promise<ApiResult<{ server_time: string; id: number; status: string }>> => {
+    const res = await api.post<{ server_time: string; id: number; status: string }>(
+      P.adminInvitations,
+      { ...data, email: data.email.trim() },
+    );
+    if (!res.ok && res.errors) {
+      const details = Object.values(res.errors).flat().join(" ");
+      if (details) return { ...res, message: details };
+    }
+    return res;
+  },
 
   /** Admin: Resend an invitation email. */
   resendInvitation: (id: number): Promise<ApiResult<{ server_time: string; message: string }>> =>

@@ -785,8 +785,8 @@ export default function AdminCohortsPage() {
                       }
                       className="w-full h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[13px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                     >
-                      <option value="SWEP">SWEP (200L / 300L On-Campus)</option>
-                      <option value="SIWES">SIWES (400L Industry Internship)</option>
+                      <option value="SWEP">SWEP (200L On-Campus)</option>
+                      <option value="SIWES">SIWES (300L / 400L Industry Internship)</option>
                     </select>
                   </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { authApi } from "@/lib/api/auth";
 import type { ValidateInviteResponse } from "@/lib/api/auth";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
@@ -28,8 +28,23 @@ function Field({ label, id, children, error }: {
 type FormState = { first_name: string; last_name: string; phone: string; password: string; confirmPassword: string };
 const INITIAL: FormState = { first_name: "", last_name: "", phone: "", password: "", confirmPassword: "" };
 
+// Keep the wrapper stable so form updates preserve the inputs and their focus.
+const InviteLayout = ({ children, invite }: {
+  children: React.ReactNode;
+  invite: ValidateInviteResponse | null;
+}) => (
+  <div className="min-h-screen lg:grid lg:grid-cols-[340px_1fr] xl:grid-cols-[380px_1fr] font-sans selection:bg-[#F04D23] selection:text-white">
+    <AuthBrandPanel variant="invite" inviteDetail={invite} />
+    <div className="min-h-screen bg-[#EDECE6] flex flex-col">
+      <MobileAuthBar />
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-8 py-8 sm:py-12">
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
 function AcceptInviteForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token") ?? "";
 
@@ -102,35 +117,22 @@ function AcceptInviteForm() {
     });
   }
 
-  /* ── Shared split layout wrapper ─────────────────────── */
-  const Layout = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen lg:grid lg:grid-cols-[340px_1fr] xl:grid-cols-[380px_1fr] font-sans selection:bg-[#F04D23] selection:text-white">
-      <AuthBrandPanel variant="invite" inviteDetail={invite} />
-      <div className="min-h-screen bg-[#EDECE6] flex flex-col">
-        <MobileAuthBar />
-        <div className="flex-1 flex items-center justify-center px-4 sm:px-8 py-8 sm:py-12">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-
   /* Loading */
   if (!token || (!invite && !loadErr)) {
     return (
-      <Layout>
+      <InviteLayout invite={invite}>
         <div className="flex items-center gap-2 text-[12.5px] text-[#7A7973]">
           <span className="size-1.5 rounded-full bg-[#F04D23] animate-pulse" />
           Validating invitation…
         </div>
-      </Layout>
+      </InviteLayout>
     );
   }
 
   /* Error */
   if (loadErr) {
     return (
-      <Layout>
+      <InviteLayout invite={invite}>
         <div className="w-full max-w-[340px]">
           <h1 className="text-[1.2rem] sm:text-[1.35rem] font-bold tracking-[-0.025em] text-[#141414] mb-2">Invalid invitation</h1>
           <p className="text-[12px] sm:text-[12.5px] text-[#7A7973] leading-relaxed mb-6">{loadErr}</p>
@@ -138,14 +140,14 @@ function AcceptInviteForm() {
             <ArrowLeft className="size-3.5" /> Go to sign in
           </Link>
         </div>
-      </Layout>
+      </InviteLayout>
     );
   }
 
   /* Done */
   if (done) {
     return (
-      <Layout>
+      <InviteLayout invite={invite}>
         <div className="w-full max-w-[340px]">
           <div className="flex items-center gap-2 mb-4">
             <span className="size-1.5 rounded-full bg-[#F04D23]" />
@@ -162,13 +164,13 @@ function AcceptInviteForm() {
             Open coordinator dashboard →
           </Link>
         </div>
-      </Layout>
+      </InviteLayout>
     );
   }
 
   /* Form */
   return (
-    <Layout>
+    <InviteLayout invite={invite}>
       <div className="w-full max-w-[340px]">
 
         {/* Heading */}
@@ -286,7 +288,7 @@ function AcceptInviteForm() {
         </p>
 
       </div>
-    </Layout>
+    </InviteLayout>
   );
 }
 
