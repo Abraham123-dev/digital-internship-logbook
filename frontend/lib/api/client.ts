@@ -1,6 +1,10 @@
 import type { ApiResult } from "@/types/api";
 
-const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api/v1";
+// Local requests use the Next.js development proxy to avoid browser CORS.
+const API_ORIGIN = process.env.NODE_ENV === "development"
+  ? ""
+  : (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
+const BASE = API_ORIGIN + "/api/v1";
 
 // ── Token storage & keys ───────────────────────────────────
 const ACCESS_KEY  = "logr_access";
