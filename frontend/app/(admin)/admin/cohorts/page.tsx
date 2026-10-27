@@ -77,7 +77,7 @@ export default function AdminCohortsPage() {
     department_ids: number[];
     session: string;
     programme: "SWEP" | "SIWES";
-    level: number;
+    level: number | "";
     start_date: string;
     end_date: string;
     total_weeks: number;
@@ -87,7 +87,7 @@ export default function AdminCohortsPage() {
     department_ids: [],
     session: "2026/2027",
     programme: "SWEP",
-    level: 300,
+    level: "",
     start_date: "",
     end_date: "",
     total_weeks: 12,
@@ -199,7 +199,7 @@ export default function AdminCohortsPage() {
       department_ids: initialFac ? initialFac.departments.map((d) => d.id) : [],
       session: "2026/2027",
       programme: "SWEP",
-      level: 300,
+      level: "",
       start_date: "",
       end_date: "",
       total_weeks: 12,
@@ -223,6 +223,10 @@ export default function AdminCohortsPage() {
       setFormError("Academic session is required (e.g. 2026/2027).");
       return;
     }
+    if (formData.programme === "SIWES" && ![300, 400].includes(Number(formData.level))) {
+      setFormError("Select 300L or 400L for this SIWES cohort.");
+      return;
+    }
     if (!formData.start_date || !formData.end_date) {
       setFormError("Start and end dates are required.");
       return;
@@ -239,7 +243,7 @@ export default function AdminCohortsPage() {
         department_ids: formData.department_ids,
         session: formData.session.trim(),
         programme: formData.programme,
-        level: formData.programme === "SWEP" ? 200 : formData.level,
+        level: formData.programme === "SWEP" ? 200 : Number(formData.level),
         start_date: formData.start_date,
         end_date: formData.end_date,
         total_weeks: formData.total_weeks || 12,
@@ -800,7 +804,7 @@ export default function AdminCohortsPage() {
                     <select
                       value={formData.programme}
                       onChange={(e) =>
-                        setFormData({ ...formData, programme: e.target.value as "SWEP" | "SIWES" })
+                        setFormData({ ...formData, programme: e.target.value as "SWEP" | "SIWES", level: "" })
                       }
                       className="w-full h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[13px] text-[#141414] outline-none transition-all focus:border-[#141414] focus:ring-1 focus:ring-[#141414] hover:border-[#BFBEB5] shadow-2xs"
                     >
@@ -808,6 +812,19 @@ export default function AdminCohortsPage() {
                       <option value="SIWES">SIWES (300L / 400L Industry Internship)</option>
                     </select>
                   </div>
+
+                  {formData.programme === "SIWES" && (
+                    <div className="space-y-1.5">
+                      <label htmlFor="cohort-level" className="text-[12px] font-medium text-[#2E2D29]">SIWES Level *</label>
+                      <select id="cohort-level" required value={formData.level}
+                        onChange={(e) => setFormData({ ...formData, level: e.target.value ? Number(e.target.value) : "" })}
+                        className="w-full h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[13px]">
+                        <option value="" disabled>Select SIWES level</option>
+                        <option value={300}>300L (Part 3)</option>
+                        <option value={400}>400L (Part 4)</option>
+                      </select>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <label className="text-[12px] font-medium text-[#2E2D29]">
@@ -891,16 +908,7 @@ export default function AdminCohortsPage() {
                   </p>
                 </div>
 
-                {formData.programme === "SIWES" && (
-                  <div className="space-y-1.5">
-                    <label htmlFor="cohort-level" className="text-[12px] font-medium text-[#2E2D29]">SIWES Level *</label>
-                    <select id="cohort-level" value={formData.level} onChange={(e) => setFormData({ ...formData, level: Number(e.target.value) })}
-                      className="w-full h-9.5 px-3 rounded-md border border-[#D5D4CE] bg-white text-[13px]">
-                      <option value={300}>300L (Part 3)</option>
-                      <option value={400}>400L (Part 4)</option>
-                    </select>
-                  </div>
-                )}
+
 
                 {/* Duration & Weeks */}
                 <div className="grid grid-cols-3 gap-3">
